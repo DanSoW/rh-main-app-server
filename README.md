@@ -1,0 +1,1 @@
+The main service for a housing rental project.
