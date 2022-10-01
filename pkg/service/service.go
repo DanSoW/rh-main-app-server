@@ -2,6 +2,7 @@ package service
 
 import (
 	adminModel "main-server/pkg/model/admin"
+	companyModel "main-server/pkg/model/company"
 	projectModel "main-server/pkg/model/project"
 	rbacModel "main-server/pkg/model/rbac"
 	userModel "main-server/pkg/model/user"
@@ -38,6 +39,8 @@ type User interface {
 	// Profile
 	GetProfile(c *gin.Context) (userModel.UserProfileModel, error)
 	UpdateProfile(c *gin.Context, data userModel.UserProfileUpdateDataModel) (userModel.UserJSONBModel, error)
+	GetUserCompany(userId, domainId int) (companyModel.CompanyDbModelEx, error)
+	AccessCheck(userId, domainId int, value rbacModel.RoleValueModel) (bool, error)
 }
 
 type Admin interface {
@@ -57,6 +60,12 @@ type Role interface {
 type Project interface {
 	CreateProject(userId, domainId int, data projectModel.ProjectModel) (projectModel.ProjectModel, error)
 	AddLogoProject(userId, domainId int, data projectModel.ProjectLogoModel) (projectModel.ProjectLogoModel, error)
+	GetProject(userId, domainId int, data projectModel.ProjectUuidModel) (projectModel.ProjectDbModel, error)
+	GetProjects(userId, domainId int, data projectModel.ProjectCountModel) (projectModel.ProjectAnyCountModel, error)
+}
+
+type Company interface {
+	GetManagers(userId, domainId int, data companyModel.ManagerCountModel) (companyModel.ManagerAnyCountModel, error)
 }
 
 type Service struct {
@@ -66,8 +75,8 @@ type Service struct {
 	Admin
 	Domain
 	Role
-
 	Project
+	Company
 }
 
 func NewService(repos *repository.Repository) *Service {
@@ -81,5 +90,6 @@ func NewService(repos *repository.Repository) *Service {
 		Domain:        NewDomainService(repos.Domain),
 		Role:          NewRoleService(repos.Role),
 		Project:       NewProjectService(repos.Project),
+		Company:       NewCompanyService(repos.Company),
 	}
 }

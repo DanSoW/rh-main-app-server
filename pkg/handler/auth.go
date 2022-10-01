@@ -13,8 +13,8 @@ import (
 
 // @Summary SignUp
 // @Tags auth
-// @Description Регистрация пользователя
-// @ID create-account
+// @Description Регистрация нового пользователя
+// @ID auth-sign-up
 // @Accept  json
 // @Produce  json
 // @Param input body userModel.UserRegisterModel true "account info"
@@ -50,7 +50,7 @@ func (h *Handler) signUp(c *gin.Context) {
 // @Summary UploadProfileImage
 // @Tags auth
 // @Description Загрузка пользовательского изображения (аватар)
-// @ID upload-profile-image
+// @ID auth-sign-up-upload-image
 // @Accept  json
 // @Produce  json
 // @Param input body userModel.UserRegisterModel true "account info"
@@ -58,7 +58,7 @@ func (h *Handler) signUp(c *gin.Context) {
 // @Failure 400,404 {object} errorResponse
 // @Failure 500 {object} errorResponse
 // @Failure default {object} errorResponse
-// @Router /auth/sign-up [post]
+// @Router /auth/sign-up/upload/image [post]
 func (h *Handler) uploadProfileImage(c *gin.Context) {
 	form, err := c.MultipartForm()
 	if err != nil {
@@ -90,7 +90,7 @@ func (h *Handler) uploadProfileImage(c *gin.Context) {
 // @Summary SignIn
 // @Tags auth
 // @Description Авторизация пользователя
-// @ID login
+// @ID auth-sign-in
 // @Accept  json
 // @Produce  json
 // @Param input body userModel.UserLoginModel true "credentials"
@@ -126,7 +126,7 @@ func (h *Handler) signIn(c *gin.Context) {
 // @Summary SignInVK
 // @Tags auth
 // @Description Авторизация пользователя через VK
-// @ID login_vk
+// @ID auth-sign-in-vk
 // @Accept  json
 // @Produce  json
 // @Param input body userModel.UserLoginModel true "credentials"
@@ -162,7 +162,7 @@ func (h *Handler) signInVK(c *gin.Context) {
 // @Summary SignInOAuth2
 // @Tags auth
 // @Description Авторизация пользователя через Google OAuth2
-// @ID login_oauth2
+// @ID auth-sign-in-oauth2
 // @Accept  json
 // @Produce  json
 // @Param input body userModel.GoogleOAuth2Code true "credentials"
@@ -203,7 +203,7 @@ func (h *Handler) signInOAuth2(c *gin.Context) {
 // @Summary Refresh
 // @Tags auth
 // @Description Обновление токена доступа и токена обновления
-// @ID refresh
+// @ID auth-refresh
 // @Accept  json
 // @Produce  json
 // @Param input body userModel.TokenRefreshModel true "credentials"
@@ -252,7 +252,7 @@ type LogoutOutputModel struct {
 // @Summary Logout
 // @Tags auth
 // @Description Выход из аккаунта
-// @ID logout
+// @ID auth-logout
 // @Accept  json
 // @Produce  json
 // @Success 200 {object} LogoutOutputModel "data"
@@ -298,7 +298,7 @@ func (h *Handler) logout(c *gin.Context) {
 // @Summary Activate
 // @Tags auth
 // @Description Активация аккаунта по почте
-// @ID activate
+// @ID auth-activate
 // @Accept  json
 // @Produce  json
 // @Success 200 {object} LogoutOutputModel "data"
@@ -322,7 +322,7 @@ func (h *Handler) activate(c *gin.Context) {
 // @Summary Recovery password
 // @Tags auth
 // @Description Запрос на смену пароля пользователем
-// @ID recovery-password
+// @ID auth-recovery-password
 // @Accept  json
 // @Produce  json
 // @Param input body userModel.UserEmailModel true "credentials"
@@ -353,7 +353,7 @@ func (h *Handler) recoveryPassword(c *gin.Context) {
 // @Summary Reset password
 // @Tags auth
 // @Description Изменение пароля пользователем
-// @ID reset-password
+// @ID auth-reset-password
 // @Accept  json
 // @Produce  json
 // @Param input body userModel.ResetPasswordModel true "credentials"

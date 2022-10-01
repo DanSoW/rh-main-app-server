@@ -7,9 +7,14 @@ import (
 	"fmt"
 	actionConstant "main-server/pkg/constant/action"
 	objectConstant "main-server/pkg/constant/object"
+	roleConstant "main-server/pkg/constant/role"
 	tableConstant "main-server/pkg/constant/table"
 	projectModel "main-server/pkg/model/project"
 	rbacModel "main-server/pkg/model/rbac"
+	userModel "main-server/pkg/model/user"
+	"main-server/pkg/model/worker"
+	"sort"
+
 	"strconv"
 	"time"
 
@@ -21,13 +26,15 @@ import (
 type ProjectPostgres struct {
 	db       *sqlx.DB
 	enforcer *casbin.Enforcer
+	role     *RolePostgres
 }
 
 /* Function for create new struct of AdminPostgres */
-func NewProjectPostgres(db *sqlx.DB, enforcer *casbin.Enforcer) *ProjectPostgres {
+func NewProjectPostgres(db *sqlx.DB, enforcer *casbin.Enforcer, role *RolePostgres) *ProjectPostgres {
 	return &ProjectPostgres{
 		db:       db,
 		enforcer: enforcer,
+		role:     role,
 	}
 }
 
@@ -46,9 +53,9 @@ func (r *ProjectPostgres) CreateProject(userId, domainId int, data projectModel.
 		return projectModel.ProjectModel{}, err
 	}
 
-	query = fmt.Sprintf("INSERT INTO %s (uuid, data, created_at, updated_at, users_id, companies_id) values ($1, $2, $3, $4, $5, $6) RETURNING uuid", tableConstant.PROJECTS_TABLE)
+	query = fmt.Sprintf("INSERT INTO %s (uuid, data, created_at, updated_at, users_id, companies_id) values ($1, $2, $3, $4, $5, $6) RETURNING id", tableConstant.PROJECTS_TABLE)
 
-	dataJson, err := json.Marshal(projectModel.ProjectDbModel{
+	dataJson, err := json.Marshal(projectModel.ProjectDataModel{
 		Title:       data.Title,
 		Description: data.Description,
 		Managers:    data.Managers,
@@ -62,10 +69,9 @@ func (r *ProjectPostgres) CreateProject(userId, domainId int, data projectModel.
 	currentDate := time.Now()
 	projectUuid := uuid.NewV4()
 
-	var uuid string
-
+	var projectId int
 	row = tx.QueryRow(query, projectUuid, dataJson, currentDate, currentDate, userId, companyId)
-	if err := row.Scan(&uuid); err != nil {
+	if err := row.Scan(&projectId); err != nil {
 		tx.Rollback()
 		return projectModel.ProjectModel{}, err
 	}
@@ -73,6 +79,56 @@ func (r *ProjectPostgres) CreateProject(userId, domainId int, data projectModel.
 	if err != nil {
 		tx.Rollback()
 		return projectModel.ProjectModel{}, err
+	}
+
+	roleAdmin, err := r.role.GetRole("value", roleConstant.ROLE_BUILDER_MANAGER)
+	if err != nil {
+		tx.Rollback()
+		return projectModel.ProjectModel{}, err
+	}
+
+	roleAdminJson, err := json.Marshal(worker.WorkerModel{
+		Role: roleAdmin.Uuid,
+	})
+
+	if err != nil {
+		tx.Rollback()
+		return projectModel.ProjectModel{}, err
+	}
+
+	query = fmt.Sprintf(`
+	INSERT INTO %s (uuid, data, created_at, updated_at, users_id, companies_id) 
+	values ($1, $2, $3, $4, $5, $6) RETURNING id`,
+		tableConstant.WORKERS_TABLE,
+	)
+
+	for _, element := range data.Managers {
+		var user userModel.UserModel
+		queryLocal := fmt.Sprintf("SELECT * FROM %s tl WHERE tl.email=$1", tableConstant.USERS_TABLE)
+		err = r.db.Get(&user, queryLocal, element.Email)
+		if err != nil {
+			tx.Rollback()
+			return projectModel.ProjectModel{}, err
+		}
+
+		var workerId int
+		row = tx.QueryRow(query, uuid.NewV4().String(), roleAdminJson, currentDate, currentDate, user.Id, companyId)
+		if err := row.Scan(&workerId); err != nil {
+			tx.Rollback()
+			return projectModel.ProjectModel{}, err
+		}
+
+		queryLocal = fmt.Sprintf(`
+		INSERT INTO %s (workers_id, projects_id) 
+		values ($1, $2)`,
+			tableConstant.WORKERS_PROJECTS_TABLE,
+		)
+
+		_, err = tx.Exec(queryLocal, workerId, projectId)
+		if err != nil {
+			tx.Rollback()
+			return projectModel.ProjectModel{}, err
+		}
 	}
 
 	// Adding information about a resource
@@ -86,9 +142,9 @@ func (r *ProjectPostgres) CreateProject(userId, domainId int, data projectModel.
 		return projectModel.ProjectModel{}, err
 	}
 
-	query = fmt.Sprintf("INSERT INTO %s (value, types_objects_id) values ($1, $2)", tableConstant.OBJECTS_TABLE)
+	query = fmt.Sprintf(`INSERT INTO %s (value, types_objects_id) values ($1, $2)`, tableConstant.OBJECTS_TABLE)
 
-	_, err = tx.Exec(query, data.Uuid, typesObjects.Id)
+	_, err = tx.Exec(query, projectUuid.String(), typesObjects.Id)
 	if err != nil {
 		tx.Rollback()
 		return projectModel.ProjectModel{}, err
@@ -99,10 +155,10 @@ func (r *ProjectPostgres) CreateProject(userId, domainId int, data projectModel.
 
 	// Update current user policy for current article
 	_, err = r.enforcer.AddPolicies([][]string{
-		{userIdStr, domainIdStr, uuid, actionConstant.DELETE},
-		{userIdStr, domainIdStr, uuid, actionConstant.MODIFY},
-		{userIdStr, domainIdStr, uuid, actionConstant.READ},
-		{userIdStr, domainIdStr, uuid, actionConstant.ADMINISTRATION},
+		{userIdStr, domainIdStr, projectUuid.String(), actionConstant.DELETE},
+		{userIdStr, domainIdStr, projectUuid.String(), actionConstant.MODIFY},
+		{userIdStr, domainIdStr, projectUuid.String(), actionConstant.READ},
+		{userIdStr, domainIdStr, projectUuid.String(), actionConstant.ADMINISTRATION},
 	})
 
 	if err != nil {
@@ -127,8 +183,8 @@ func (r *ProjectPostgres) CreateProject(userId, domainId int, data projectModel.
 		userManagerIdStr := strconv.Itoa(userManagerId)
 
 		_, err = r.enforcer.AddPolicies([][]string{
-			{userManagerIdStr, domainIdStr, uuid, actionConstant.READ},
-			{userManagerIdStr, domainIdStr, uuid, actionConstant.MANAGEMENT},
+			{userManagerIdStr, domainIdStr, projectUuid.String(), actionConstant.READ},
+			{userManagerIdStr, domainIdStr, projectUuid.String(), actionConstant.MANAGEMENT},
 		})
 	}
 
@@ -136,10 +192,10 @@ func (r *ProjectPostgres) CreateProject(userId, domainId int, data projectModel.
 	if err := tx.Commit(); err != nil {
 		// Rejected
 		r.enforcer.RemovePolicies([][]string{
-			{userIdStr, domainIdStr, uuid, actionConstant.DELETE},
-			{userIdStr, domainIdStr, uuid, actionConstant.MODIFY},
-			{userIdStr, domainIdStr, uuid, actionConstant.READ},
-			{userIdStr, domainIdStr, uuid, actionConstant.ADMINISTRATION},
+			{userIdStr, domainIdStr, projectUuid.String(), actionConstant.DELETE},
+			{userIdStr, domainIdStr, projectUuid.String(), actionConstant.MODIFY},
+			{userIdStr, domainIdStr, projectUuid.String(), actionConstant.READ},
+			{userIdStr, domainIdStr, projectUuid.String(), actionConstant.ADMINISTRATION},
 		})
 
 		for _, element := range data.Managers {
@@ -152,8 +208,8 @@ func (r *ProjectPostgres) CreateProject(userId, domainId int, data projectModel.
 			userManagerIdStr := strconv.Itoa(userManagerId)
 
 			_, err = r.enforcer.RemovePolicies([][]string{
-				{userManagerIdStr, domainIdStr, uuid, actionConstant.READ},
-				{userManagerIdStr, domainIdStr, uuid, actionConstant.MANAGEMENT},
+				{userManagerIdStr, domainIdStr, projectUuid.String(), actionConstant.READ},
+				{userManagerIdStr, domainIdStr, projectUuid.String(), actionConstant.MANAGEMENT},
 			})
 		}
 
@@ -166,7 +222,7 @@ func (r *ProjectPostgres) CreateProject(userId, domainId int, data projectModel.
 		Title:       data.Title,
 		Description: data.Description,
 		Managers:    data.Managers,
-		Uuid:        uuid,
+		Uuid:        projectUuid.String(),
 	}, nil
 }
 
@@ -208,4 +264,124 @@ func (r *ProjectPostgres) AddLogoProject(userId, domainId int, data projectModel
 	}
 
 	return data, nil
+}
+
+/* Get information about one project */
+func (r *ProjectPostgres) GetProject(userId, domainId int, data projectModel.ProjectUuidModel) (projectModel.ProjectDbModel, error) {
+	var project projectModel.ProjectDbModel
+
+	query := fmt.Sprintf("SELECT uuid, data, created_at FROM %s tl WHERE tl.uuid = $1 LIMIT 1", tableConstant.PROJECTS_TABLE)
+
+	err := r.db.Get(&project, query, data.Uuid)
+	if err != nil {
+		return projectModel.ProjectDbModel{}, err
+	}
+
+	return project, nil
+}
+
+/* Get information about any count projects */
+func (r *ProjectPostgres) GetProjects(userId, domainId int, data projectModel.ProjectCountModel) (projectModel.ProjectAnyCountModel, error) {
+	query := fmt.Sprintf("SELECT id FROM %s WHERE uuid=$1", tableConstant.COMPANIES_TABLE)
+	var companyId int
+
+	row := r.db.QueryRow(query, data.Uuid)
+	if err := row.Scan(&companyId); err != nil {
+		return projectModel.ProjectAnyCountModel{}, err
+	}
+
+	var projects []projectModel.ProjectDbModel
+	sum := (data.Count + data.Limit)
+
+	query = fmt.Sprintf("SELECT uuid, data, created_at FROM %s tl WHERE tl.companies_id = $1", tableConstant.PROJECTS_TABLE)
+	err := r.db.Select(&projects, query, companyId)
+	if err != nil {
+		return projectModel.ProjectAnyCountModel{}, err
+	}
+
+	var projectsEx []projectModel.ProjectDbDataEx
+	for _, element := range projects {
+		var projectData projectModel.ProjectDataModel
+		err = json.Unmarshal([]byte(element.Data), &projectData)
+
+		if err != nil {
+			return projectModel.ProjectAnyCountModel{}, err
+		}
+
+		projectsEx = append(projectsEx, projectModel.ProjectDbDataEx{
+			Uuid:      element.Uuid,
+			Data:      projectData,
+			CreatedAt: element.CreatedAt,
+		})
+	}
+
+	sort.SliceStable(projectsEx, func(i, j int) bool {
+		return projectsEx[i].CreatedAt.After(projectsEx[j].CreatedAt)
+	})
+
+	if data.Count >= len(projectsEx) {
+		return projectModel.ProjectAnyCountModel{}, nil
+	}
+
+	if sum >= len(projectsEx) {
+		sum -= (sum - len(projectsEx))
+	}
+
+	return projectModel.ProjectAnyCountModel{
+		Projects: projectsEx[data.Count:sum],
+		Count:    (sum - data.Count),
+	}, nil
+}
+
+/* Get information about any count managers for current project */
+func (r *ProjectPostgres) GetProjectManagers(userId, domainId int, data projectModel.ProjectCountModel) (projectModel.ProjectAnyCountModel, error) {
+	query := fmt.Sprintf("SELECT id FROM %s WHERE uuid=$1", tableConstant.COMPANIES_TABLE)
+	var companyId int
+
+	row := r.db.QueryRow(query, data.Uuid)
+	if err := row.Scan(&companyId); err != nil {
+		return projectModel.ProjectAnyCountModel{}, err
+	}
+
+	var projects []projectModel.ProjectDbModel
+	sum := (data.Count + data.Limit)
+
+	query = fmt.Sprintf("SELECT uuid, data, created_at FROM %s tl WHERE tl.companies_id = $1 LIMIT $2", tableConstant.PROJECTS_TABLE)
+	err := r.db.Select(&projects, query, companyId, sum)
+	if err != nil {
+		return projectModel.ProjectAnyCountModel{}, err
+	}
+
+	var projectsEx []projectModel.ProjectDbDataEx
+	for _, element := range projects {
+		var projectData projectModel.ProjectDataModel
+		err = json.Unmarshal([]byte(element.Data), &projectData)
+
+		if err != nil {
+			return projectModel.ProjectAnyCountModel{}, err
+		}
+
+		projectsEx = append(projectsEx, projectModel.ProjectDbDataEx{
+			Uuid:      element.Uuid,
+			Data:      projectData,
+			CreatedAt: element.CreatedAt,
+		})
+	}
+
+	sort.SliceStable(projectsEx, func(i, j int) bool {
+		return projectsEx[i].CreatedAt.After(projectsEx[j].CreatedAt)
+	})
+
+	if data.Count >= len(projectsEx) {
+		return projectModel.ProjectAnyCountModel{}, nil
+	}
+
+	if sum >= len(projectsEx) {
+		sum -= (sum - len(projectsEx))
+	}
+
+	return projectModel.ProjectAnyCountModel{
+		Projects: projectsEx[data.Count:sum],
+		Count:    (sum - data.Count),
+	}, nil
 }

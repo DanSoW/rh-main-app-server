@@ -26,3 +26,13 @@ func (s *ProjectService) CreateProject(userId, domainId int, data projectModel.P
 func (s *ProjectService) AddLogoProject(userId, domainId int, data projectModel.ProjectLogoModel) (projectModel.ProjectLogoModel, error) {
 	return s.repo.AddLogoProject(userId, domainId, data)
 }
+
+/* Method for get information about object */
+func (s *ProjectService) GetProject(userId, domainId int, data projectModel.ProjectUuidModel) (projectModel.ProjectDbModel, error) {
+	return s.repo.GetProject(userId, domainId, data)
+}
+
+/* Method for get any count projects */
+func (s *ProjectService) GetProjects(userId, domainId int, data projectModel.ProjectCountModel) (projectModel.ProjectAnyCountModel, error) {
+	return s.repo.GetProjects(userId, domainId, data)
+}

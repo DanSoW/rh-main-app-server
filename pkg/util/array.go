@@ -1,6 +1,9 @@
 package utils
 
-import "reflect"
+import (
+	companyModel "main-server/pkg/model/company"
+	"reflect"
+)
 
 func InArray(val interface{}, array interface{}) (exists bool, index int) {
 	exists = false
@@ -20,4 +23,19 @@ func InArray(val interface{}, array interface{}) (exists bool, index int) {
 	}
 
 	return
+}
+
+/* Function for remove duplicate elements in slice */
+func RemoveDuplicate(sliceList []companyModel.ManagerDataEx) []companyModel.ManagerDataEx {
+	allKeys := make(map[string]bool)
+	list := []companyModel.ManagerDataEx{}
+
+	for _, item := range sliceList {
+		if _, value := allKeys[item.Uuid]; !value {
+			allKeys[item.Uuid] = true
+			list = append(list, item)
+		}
+	}
+
+	return list
 }

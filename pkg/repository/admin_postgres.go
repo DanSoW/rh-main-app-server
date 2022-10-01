@@ -7,9 +7,12 @@ import (
 	actionConstant "main-server/pkg/constant/action"
 	middlewareConstant "main-server/pkg/constant/middleware"
 	objectConstant "main-server/pkg/constant/object"
+	roleConstant "main-server/pkg/constant/role"
 	tableConstant "main-server/pkg/constant/table"
 	adminModel "main-server/pkg/model/admin"
 	rbacModel "main-server/pkg/model/rbac"
+	userModel "main-server/pkg/model/user"
+	"main-server/pkg/model/worker"
 	"strconv"
 	"time"
 
@@ -23,14 +26,21 @@ type AdminPostgres struct {
 	db       *sqlx.DB
 	enforcer *casbin.Enforcer
 	domain   *DomainPostgres
+	role     *RolePostgres
 }
 
 /* Function for create new struct of AdminPostgres */
-func NewAdminPostgres(db *sqlx.DB, enforcer *casbin.Enforcer, domain *DomainPostgres) *AdminPostgres {
+func NewAdminPostgres(
+	db *sqlx.DB,
+	enforcer *casbin.Enforcer,
+	domain *DomainPostgres,
+	role *RolePostgres,
+) *AdminPostgres {
 	return &AdminPostgres{
 		db:       db,
 		enforcer: enforcer,
 		domain:   domain,
+		role:     role,
 	}
 }
 
@@ -62,7 +72,7 @@ func (r *AdminPostgres) CreateCompany(c *gin.Context, data adminModel.CompanyMod
 		return adminModel.CompanyModel{}, err
 	}
 
-	query := fmt.Sprintf("INSERT INTO %s (uuid, data, created_at, updated_at, users_id) values ($1, $2, $3, $4, $5)", tableConstant.COMPANIES_TABLE)
+	query := fmt.Sprintf("INSERT INTO %s (uuid, data, created_at, updated_at, users_id) values ($1, $2, $3, $4, $5) RETURNING id", tableConstant.COMPANIES_TABLE)
 
 	dataJson, err := json.Marshal(data)
 	if err != nil {
@@ -70,10 +80,15 @@ func (r *AdminPostgres) CreateCompany(c *gin.Context, data adminModel.CompanyMod
 		return adminModel.CompanyModel{}, err
 	}
 
+	var companyId int
 	currentDate := time.Now()
 	companyUuid := uuid.NewV4()
 
-	_, err = tx.Exec(query, companyUuid, dataJson, currentDate, currentDate, usersId)
+	row := tx.QueryRow(query, companyUuid, dataJson, currentDate, currentDate, usersId)
+	if err := row.Scan(&companyId); err != nil {
+		tx.Rollback()
+		return adminModel.CompanyModel{}, err
+	}
 
 	if err != nil {
 		tx.Rollback()
@@ -99,11 +114,47 @@ func (r *AdminPostgres) CreateCompany(c *gin.Context, data adminModel.CompanyMod
 		return adminModel.CompanyModel{}, err
 	}
 
+	// Adding information about a user belonging to a company
+	var user userModel.UserModel
+	query = fmt.Sprintf("SELECT * FROM %s tl WHERE tl.email=$1", tableConstant.USERS_TABLE)
+	err = r.db.Get(&user, query, data.EmailAdmin)
+	if err != nil {
+		tx.Rollback()
+		return adminModel.CompanyModel{}, err
+	}
+
+	query = fmt.Sprintf(`
+	INSERT INTO %s (uuid, data, created_at, updated_at, users_id, companies_id) 
+	values ($1, $2, $3, $4, $5, $6) RETURNING id`,
+		tableConstant.WORKERS_TABLE,
+	)
+
+	roleAdmin, err := r.role.GetRole("value", roleConstant.ROLE_BUILDER_ADMIN)
+	if err != nil {
+		tx.Rollback()
+		return adminModel.CompanyModel{}, err
+	}
+
+	roleAdminJson, err := json.Marshal(worker.WorkerModel{
+		Role: roleAdmin.Uuid,
+	})
+
+	if err != nil {
+		tx.Rollback()
+		return adminModel.CompanyModel{}, err
+	}
+
+	var workerId int
+	row = tx.QueryRow(query, uuid.NewV4().String(), roleAdminJson, currentDate, currentDate, user.Id, companyId)
+	if err := row.Scan(&workerId); err != nil {
+		tx.Rollback()
+		return adminModel.CompanyModel{}, err
+	}
+
 	var userId string = strconv.Itoa(usersId.(int))
 	var domainId string = strconv.Itoa(domainsId.(int))
 
 	// Update current user policy for current article
-
 	// For creator company
 	_, err = r.enforcer.AddPolicies([][]string{
 		{userId, domainId, companyUuid.String(), actionConstant.DELETE},
@@ -121,7 +172,7 @@ func (r *AdminPostgres) CreateCompany(c *gin.Context, data adminModel.CompanyMod
 	query = fmt.Sprintf("SELECT id FROM %s WHERE email=$1 LIMIT 1", tableConstant.USERS_TABLE)
 	var userAdminId int
 
-	row := r.db.QueryRow(query, data.EmailAdmin)
+	row = r.db.QueryRow(query, data.EmailAdmin)
 	if err := row.Scan(&userAdminId); err != nil {
 		r.enforcer.RemovePolicies([][]string{
 			{userId, domainId, companyUuid.String(), actionConstant.DELETE},

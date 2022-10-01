@@ -10,8 +10,8 @@ import (
 
 // @Summary GetAllUsers
 // @Tags admin
-// @Description Get all users, which are located in system
-// @ID get-all-users
+// @Description Получение списка всех пользователей находящихся в системе
+// @ID admin-user-get-all
 // @Accept  json
 // @Produce  json
 // @Success 200 {object} adminModel.UsersResponseModel "data"
@@ -34,11 +34,18 @@ func (h *Handler) getAllUsers(c *gin.Context) {
 
 // @Summary CreateCompany
 // @Tags admin
-// @Description Get all users, which are located in system
-// @ID get-all-users
+// @Description Создание новой компании (доступно только администратору)
+// @ID admin-company-create
 // @Accept  json
 // @Produce  json
-// @Success 200 {object} adminModel.UsersResponseModel "data"
+// @Param logo query string true "logo"
+// @Param title query string true "title"
+// @Param description query string true "description"
+// @Param email_company query string true "email_company"
+// @Param email_admin query string true "email_admin"
+// @Param phone query string true "phone"
+// @Param link query string true "link"
+// @Success 200 {object} adminModel.CompanyModel "data"
 // @Failure 400,404 {object} errorResponse
 // @Failure 500 {object} errorResponse
 // @Failure default {object} errorResponse

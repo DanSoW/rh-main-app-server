@@ -14,3 +14,15 @@ type UsersRolesModel struct {
 	UsersId string `json:"users_id" db:"users_id"`
 	RolesId string `json:"roles_id" db:"roles_id"`
 }
+
+type RoleDataModel struct {
+	Role string `json:"role" db:"role"`
+}
+
+type RoleValueModel struct {
+	Value string `json:"value" binding:"required"`
+}
+
+type RolesUserModel struct {
+	Roles []string `json:"roles" binding:"required"`
+}

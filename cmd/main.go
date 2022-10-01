@@ -82,9 +82,9 @@ func saveToken(path string, token *oauth2.Token) {
 	json.NewEncoder(f).Encode(token)
 }
 
-// @title MISU Main Server
+// @title Rental Housing
 // @version 1.0
-// description Analytical core for the MISU Mirny project
+// description Проект для аренды жилья
 
 // @host localhost:5000
 // @BasePath /
@@ -287,7 +287,7 @@ func main() {
 		}
 	}()
 
-	logrus.Print("MISU Main Server Started")
+	logrus.Print("Rental Housing Main Server Started")
 
 	// Реализация Graceful Shutdown
 	// Блокировка функции main с помощью канала os.Signal
@@ -300,7 +300,7 @@ func main() {
 	// Чтение из канала, блокирующая выполнение функции main
 	<-quit
 
-	logrus.Print("MISU Main Server Shutting Down")
+	logrus.Print("Rental Housing Main Server Shutting Down")
 
 	if err := srv.Shutdown(context.Background()); err != nil {
 		logrus.Errorf("error occured on server shutting down: %s", err.Error())

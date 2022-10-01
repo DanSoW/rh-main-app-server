@@ -1,7 +1,7 @@
 package handler
 
 import (
-	middlewareConstant "main-server/pkg/constant/middleware"
+	"encoding/json"
 	projectModel "main-server/pkg/model/project"
 	"net/http"
 
@@ -10,12 +10,13 @@ import (
 )
 
 // @Summary CreateProject
-// @Tags project
-// @Description Get all users, which are located in system
-// @ID get-all-users
+// @Tags company
+// @Description Создание нового проекта в компании
+// @ID company-project-create
 // @Accept  json
 // @Produce  json
-// @Success 200 {object} adminModel.UsersResponseModel "data"
+// @Param input body projectModel.ProjectModel true "credentials"
+// @Success 200 {object} projectModel.ProjectModel "data"
 // @Failure 400,404 {object} errorResponse
 // @Failure 500 {object} errorResponse
 // @Failure default {object} errorResponse
@@ -28,10 +29,95 @@ func (h *Handler) createProject(c *gin.Context) {
 		return
 	}
 
-	userId, _ := c.Get(middlewareConstant.USER_CTX)
-	domainId, _ := c.Get(middlewareConstant.DOMAINS_ID)
+	userId, domainId, err := getContextUserInfo(c)
+	if err != nil {
+		newErrorResponse(c, http.StatusForbidden, err.Error())
+		return
+	}
 
-	data, err := h.services.Project.CreateProject(userId.(int), domainId.(int), input)
+	data, err := h.services.Project.CreateProject(userId, domainId, input)
+	if err != nil {
+		newErrorResponse(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	c.JSON(http.StatusOK, data)
+}
+
+// @Summary GetProject
+// @Tags company
+// @Description Получение информации о конкретном проекте
+// @ID company-project-get
+// @Accept  json
+// @Produce  json
+// @Param input body projectModel.ProjectUuidModel true "credentials"
+// @Success 200 {object} projectModel.ProjectDbDataEx "data"
+// @Failure 400,404 {object} errorResponse
+// @Failure 500 {object} errorResponse
+// @Failure default {object} errorResponse
+// @Router /company/project/get [post]
+func (h *Handler) getProject(c *gin.Context) {
+	var input projectModel.ProjectUuidModel
+
+	if err := c.BindJSON(&input); err != nil {
+		newErrorResponse(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	userId, domainId, err := getContextUserInfo(c)
+	if err != nil {
+		newErrorResponse(c, http.StatusForbidden, err.Error())
+		return
+	}
+
+	data, err := h.services.Project.GetProject(userId, domainId, input)
+	if err != nil {
+		newErrorResponse(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// From json to object
+	var projectData projectModel.ProjectDataModel
+	err = json.Unmarshal([]byte(data.Data), &projectData)
+	if err != nil {
+		newErrorResponse(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	c.JSON(http.StatusOK, projectModel.ProjectDbDataEx{
+		Uuid:      data.Uuid,
+		Data:      projectData,
+		CreatedAt: data.CreatedAt,
+	})
+}
+
+// @Summary GetProjects
+// @Tags company
+// @Description Получение среза из общего числа проектов компании
+// @ID company-project-get-all
+// @Accept  json
+// @Produce  json
+// @Param input body projectModel.ProjectCountModel true "credentials"
+// @Success 200 {object} projectModel.ProjectAnyCountModel "data"
+// @Failure 400,404 {object} errorResponse
+// @Failure 500 {object} errorResponse
+// @Failure default {object} errorResponse
+// @Router /company/project/get/all [post]
+func (h *Handler) getProjects(c *gin.Context) {
+	var input projectModel.ProjectCountModel
+
+	if err := c.BindJSON(&input); err != nil {
+		newErrorResponse(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	userId, domainId, err := getContextUserInfo(c)
+	if err != nil {
+		newErrorResponse(c, http.StatusForbidden, err.Error())
+		return
+	}
+
+	data, err := h.services.Project.GetProjects(userId, domainId, input)
 	if err != nil {
 		newErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
@@ -41,12 +127,14 @@ func (h *Handler) createProject(c *gin.Context) {
 }
 
 // @Summary AddLogoProject
-// @Tags project
-// @Description Add logo to project
-// @ID add-logo-project
+// @Tags company
+// @Description Добавление нового логотипа проекта
+// @ID company-project-add-logo
 // @Accept  json
 // @Produce  json
-// @Success 200 {object} adminModel.UsersResponseModel "data"
+// @Param logo query string true "logo"
+// @Param uuid query string true "uuid"
+// @Success 200 {object} projectModel.ProjectLogoModel "data"
 // @Failure 400,404 {object} errorResponse
 // @Failure 500 {object} errorResponse
 // @Failure default {object} errorResponse
@@ -65,12 +153,15 @@ func (h *Handler) addLogoProject(c *gin.Context) {
 	newFilename := uuid.NewV4().String()
 	filepath := "public/project/" + newFilename
 
-	userId, _ := c.Get(middlewareConstant.USER_CTX)
-	domainId, _ := c.Get(middlewareConstant.DOMAINS_ID)
+	userId, domainId, err := getContextUserInfo(c)
+	if err != nil {
+		newErrorResponse(c, http.StatusForbidden, err.Error())
+		return
+	}
 
 	data, err := h.services.Project.AddLogoProject(
-		userId.(int),
-		domainId.(int),
+		userId,
+		domainId,
 		projectModel.ProjectLogoModel{
 			Filepath: filepath,
 			Uuid:     projectUuid,

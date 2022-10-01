@@ -2,6 +2,7 @@ package repository
 
 import (
 	adminModel "main-server/pkg/model/admin"
+	companyModel "main-server/pkg/model/company"
 	projectModel "main-server/pkg/model/project"
 	rbacModel "main-server/pkg/model/rbac"
 	userModel "main-server/pkg/model/user"
@@ -43,10 +44,10 @@ type Domain interface {
 
 type User interface {
 	GetUser(column, value interface{}) (userModel.UserModel, error)
-
-	// Profile
 	GetProfile(c *gin.Context) (userModel.UserProfileModel, error)
 	UpdateProfile(c *gin.Context, data userModel.UserProfileUpdateDataModel) (userModel.UserJSONBModel, error)
+	GetUserCompany(userId, domainId int) (companyModel.CompanyDbModelEx, error)
+	AccessCheck(userId, domainId int, value rbacModel.RoleValueModel) (bool, error)
 }
 
 type Admin interface {
@@ -61,6 +62,12 @@ type AuthType interface {
 type Project interface {
 	CreateProject(userId, domainId int, data projectModel.ProjectModel) (projectModel.ProjectModel, error)
 	AddLogoProject(userId, domainId int, data projectModel.ProjectLogoModel) (projectModel.ProjectLogoModel, error)
+	GetProject(userId, domainId int, data projectModel.ProjectUuidModel) (projectModel.ProjectDbModel, error)
+	GetProjects(userId, domainId int, data projectModel.ProjectCountModel) (projectModel.ProjectAnyCountModel, error)
+}
+
+type Company interface {
+	GetManagers(userId, domainId int, data companyModel.ManagerCountModel) (companyModel.ManagerAnyCountModel, error)
 }
 
 type Repository struct {
@@ -70,23 +77,26 @@ type Repository struct {
 	User
 	Admin
 	AuthType
-
 	Project
+	Company
 }
 
 func NewRepository(db *sqlx.DB, enforcer *casbin.Enforcer) *Repository {
 	domain := NewDomainPostgres(db)
-	user := NewUserPostgres(db, enforcer, domain)
-	admin := NewAdminPostgres(db, enforcer, domain)
-	project := NewProjectPostgres(db, enforcer)
+	role := NewRolePostgres(db, enforcer)
+	user := NewUserPostgres(db, enforcer, domain, role)
+	admin := NewAdminPostgres(db, enforcer, domain, role)
+	project := NewProjectPostgres(db, enforcer, role)
+	company := NewCompanyPostgres(db, enforcer, role)
 
 	return &Repository{
 		Authorization: NewAuthPostgres(db, enforcer, *user),
-		Role:          NewRolePostgres(db, enforcer),
+		Role:          role,
 		Domain:        domain,
 		User:          user,
 		Admin:         admin,
 		AuthType:      NewAuthTypePostgres(db),
 		Project:       project,
+		Company:       company,
 	}
 }
