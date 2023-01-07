@@ -44,12 +44,9 @@ func NewAdminPostgres(
 	}
 }
 
-/* Method for get all users, when location in system */
+/* Метод для получения информации обо всех пользователях */
 func (r *AdminPostgres) GetAllUsers(c *gin.Context) (adminModel.UsersResponseModel, error) {
-	/*usersId, _ := c.Get(middlewareConstant.USER_CTX)
-	domainsId, _ := c.Get(middlewareConstant.DOMAINS_ID)*/
-
-	// Select all users without ban
+	// Получение email-адресов всех пользователей
 	query := fmt.Sprintf(`SELECT email FROM %s`, tableConstant.USERS_TABLE)
 	var users []adminModel.UserResponseModel
 
@@ -62,11 +59,12 @@ func (r *AdminPostgres) GetAllUsers(c *gin.Context) (adminModel.UsersResponseMod
 	}, nil
 }
 
+/* Функция создания новой компании (доступно админу) */
 func (r *AdminPostgres) CreateCompany(c *gin.Context, data adminModel.CompanyModel) (adminModel.CompanyModel, error) {
 	usersId, _ := c.Get(middlewareConstant.USER_CTX)
 	domainsId, _ := c.Get(middlewareConstant.DOMAINS_ID)
 
-	// Wrapping all operations into a transaction
+	// Обёртка всех операций в одну транзакцию в рамках текущей функции
 	tx, err := r.db.Begin()
 	if err != nil {
 		return adminModel.CompanyModel{}, err
@@ -74,6 +72,7 @@ func (r *AdminPostgres) CreateCompany(c *gin.Context, data adminModel.CompanyMod
 
 	query := fmt.Sprintf("INSERT INTO %s (uuid, data, created_at, updated_at, users_id) values ($1, $2, $3, $4, $5) RETURNING id", tableConstant.COMPANIES_TABLE)
 
+	// Преобразование данных структуры в данные JSON
 	dataJson, err := json.Marshal(data)
 	if err != nil {
 		tx.Rollback()
@@ -95,7 +94,7 @@ func (r *AdminPostgres) CreateCompany(c *gin.Context, data adminModel.CompanyMod
 		return adminModel.CompanyModel{}, err
 	}
 
-	// Adding information about a resource
+	// Добавление информации о новом объекте (объект в данном случае - это компания)
 	var typesObjects rbacModel.TypesObjectsModel
 
 	query = fmt.Sprintf("SELECT * FROM %s WHERE value=$1", tableConstant.TYPES_OBJECTS_TABLE)
@@ -114,7 +113,7 @@ func (r *AdminPostgres) CreateCompany(c *gin.Context, data adminModel.CompanyMod
 		return adminModel.CompanyModel{}, err
 	}
 
-	// Adding information about a user belonging to a company
+	// Добавление информации о пользователе в текущей компании
 	var user userModel.UserModel
 	query = fmt.Sprintf("SELECT * FROM %s tl WHERE tl.email=$1", tableConstant.USERS_TABLE)
 	err = r.db.Get(&user, query, data.EmailAdmin)
@@ -153,15 +152,22 @@ func (r *AdminPostgres) CreateCompany(c *gin.Context, data adminModel.CompanyMod
 
 	var userId string = strconv.Itoa(usersId.(int))
 	var domainId string = strconv.Itoa(domainsId.(int))
+	var roleAdminId string = strconv.Itoa(roleAdmin.Id)
 
-	// Update current user policy for current article
-	// For creator company
+	// Обновление политик управления доступа для текущего пользователя
 	_, err = r.enforcer.AddPolicies([][]string{
 		{userId, domainId, companyUuid.String(), actionConstant.DELETE},
 		{userId, domainId, companyUuid.String(), actionConstant.MODIFY},
 		{userId, domainId, companyUuid.String(), actionConstant.READ},
 		{userId, domainId, companyUuid.String(), actionConstant.ADMINISTRATION},
 	})
+
+	if err != nil {
+		tx.Rollback()
+		return adminModel.CompanyModel{}, err
+	}
+
+	_, err = r.enforcer.AddRoleForUserInDomain(userId, roleAdminId, domainId)
 
 	if err != nil {
 		tx.Rollback()

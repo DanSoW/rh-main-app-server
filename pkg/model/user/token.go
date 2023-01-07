@@ -20,7 +20,14 @@ type TokenLogoutDataModel struct {
 }
 
 type TokenOutputParse struct {
-	UsersId  int           `json:"users_id"`
+	UsersId   int           `json:"users_id"`
+	UsersUuid string        `json:"uuid"`
+	AuthType  AuthTypeModel `json:"auth_types"`
+	TokenApi  *string       `json:"token_api"`
+}
+
+type TokenOutputParseUU struct {
+	UsersId  string        `json:"users_id"`
 	AuthType AuthTypeModel `json:"auth_types"`
 	TokenApi *string       `json:"token_api"`
 }

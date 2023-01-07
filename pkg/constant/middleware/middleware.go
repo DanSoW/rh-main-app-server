@@ -3,6 +3,7 @@ package middleware
 const (
 	AUTHORIZATION_HEADER = "Authorization"
 	USER_CTX             = "users_id"
+	USER_UUID_CTX        = "users_uuid"
 	AUTH_TYPE_VALUE_CTX  = "auth_type_value"
 	ACCESS_TOKEN_CTX     = "access_token"
 	TOKEN_API_CTX        = "token_api"

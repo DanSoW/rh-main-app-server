@@ -8,14 +8,14 @@ import (
 	"github.com/dgrijalva/jwt-go"
 )
 
-/* Structure of current repository */
+/* Структура TokenService */
 type TokenService struct {
 	role     repository.Role
 	user     repository.User
 	authType repository.AuthType
 }
 
-/* Function create a new service */
+/* Функция создания нового сервиса TokenService */
 func NewTokenService(role repository.Role,
 	user repository.User,
 	authType repository.AuthType,
@@ -27,7 +27,7 @@ func NewTokenService(role repository.Role,
 	}
 }
 
-/* Structure body token for user */
+/* Структура полезных данных JWT-токена */
 type tokenClaims struct {
 	jwt.StandardClaims
 	UsersId     string  `json:"users_id"`      // ID for user
@@ -35,7 +35,7 @@ type tokenClaims struct {
 	TokenApi    *string `json:"token_api"`     // External token access
 }
 
-/* Parse token with validate check */
+/* Парсинг токена с предварительной валидацией */
 func (s *TokenService) ParseToken(pToken, signingKey string) (userModel.TokenOutputParse, error) {
 	token, err := jwt.ParseWithClaims(pToken, &tokenClaims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -53,7 +53,6 @@ func (s *TokenService) ParseToken(pToken, signingKey string) (userModel.TokenOut
 		return userModel.TokenOutputParse{}, err
 	}
 
-	/* Get data from token */
 	claims, ok := token.Claims.(*tokenClaims)
 	if !ok {
 		return userModel.TokenOutputParse{}, errors.New("token claims are not of type")
@@ -72,9 +71,10 @@ func (s *TokenService) ParseToken(pToken, signingKey string) (userModel.TokenOut
 	}
 
 	return userModel.TokenOutputParse{
-		UsersId:  user.Id,
-		AuthType: authType,
-		TokenApi: claims.TokenApi,
+		UsersId:   user.Id,
+		UsersUuid: claims.UsersId,
+		AuthType:  authType,
+		TokenApi:  claims.TokenApi,
 	}, nil
 }
 
@@ -113,7 +113,7 @@ func (s *TokenService) ParseTokenWithoutValid(pToken, signingKey string) (userMo
 	}, nil
 }
 
-/* Structure body token for reset password user */
+/* Структура тела токена для смены пароля пользователя (частный случай) */
 type tokenResetClaims struct {
 	jwt.StandardClaims
 	UsersId string `json:"users_id"` // ID пользователя

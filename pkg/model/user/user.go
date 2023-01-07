@@ -1,5 +1,15 @@
 package user
 
+type UserIdentityModel struct {
+	UserId   int
+	DomainId int
+}
+
+/* A model for user uuid */
+type UserUuidModel struct {
+	Uuid string `json:"uuid" binding:"required" db:"uuid"`
+}
+
 /* A model for working with an instance of user data from the users table */
 type UserModel struct {
 	Id       int    `json:"id" db:"id"`
@@ -74,4 +84,9 @@ type UserAuthTypeModel struct {
 /* A model for email address every users */
 type UserEmailModel struct {
 	Email string `json:"email" db:"email"`
+}
+
+/* Структура для ролей пользователя*/
+type UserRoleModel struct {
+	Roles []string `json:"roles" binding:"required"`
 }

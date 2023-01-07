@@ -2,7 +2,9 @@ package handler
 
 import (
 	"encoding/json"
+	pathConstant "main-server/pkg/constant/path"
 	projectModel "main-server/pkg/model/project"
+	userModel "main-server/pkg/model/user"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -10,7 +12,7 @@ import (
 )
 
 // @Summary CreateProject
-// @Tags company
+// @Tags project
 // @Description Создание нового проекта в компании
 // @ID company-project-create
 // @Accept  json
@@ -29,7 +31,7 @@ func (h *Handler) createProject(c *gin.Context) {
 		return
 	}
 
-	userId, domainId, err := getContextUserInfo(c)
+	userId, _, domainId, err := getContextUserInfo(c)
 	if err != nil {
 		newErrorResponse(c, http.StatusForbidden, err.Error())
 		return
@@ -45,7 +47,7 @@ func (h *Handler) createProject(c *gin.Context) {
 }
 
 // @Summary GetProject
-// @Tags company
+// @Tags project
 // @Description Получение информации о конкретном проекте
 // @ID company-project-get
 // @Accept  json
@@ -64,7 +66,7 @@ func (h *Handler) getProject(c *gin.Context) {
 		return
 	}
 
-	userId, domainId, err := getContextUserInfo(c)
+	userId, _, domainId, err := getContextUserInfo(c)
 	if err != nil {
 		newErrorResponse(c, http.StatusForbidden, err.Error())
 		return
@@ -92,7 +94,7 @@ func (h *Handler) getProject(c *gin.Context) {
 }
 
 // @Summary GetProjects
-// @Tags company
+// @Tags project
 // @Description Получение среза из общего числа проектов компании
 // @ID company-project-get-all
 // @Accept  json
@@ -111,7 +113,7 @@ func (h *Handler) getProjects(c *gin.Context) {
 		return
 	}
 
-	userId, domainId, err := getContextUserInfo(c)
+	userId, _, domainId, err := getContextUserInfo(c)
 	if err != nil {
 		newErrorResponse(c, http.StatusForbidden, err.Error())
 		return
@@ -126,20 +128,20 @@ func (h *Handler) getProjects(c *gin.Context) {
 	c.JSON(http.StatusOK, data)
 }
 
-// @Summary AddLogoProject
-// @Tags company
+// @Summary ProjectUpdateImage
+// @Tags project
 // @Description Добавление нового логотипа проекта
 // @ID company-project-add-logo
 // @Accept  json
 // @Produce  json
 // @Param logo query string true "logo"
 // @Param uuid query string true "uuid"
-// @Success 200 {object} projectModel.ProjectLogoModel "data"
+// @Success 200 {object} projectModel.ProjectImageModel "data"
 // @Failure 400,404 {object} errorResponse
 // @Failure 500 {object} errorResponse
 // @Failure default {object} errorResponse
-// @Router /company/project/add/logo [post]
-func (h *Handler) addLogoProject(c *gin.Context) {
+// @Router /company/project/update/image [post]
+func (h *Handler) projectUpdateImage(c *gin.Context) {
 	form, err := c.MultipartForm()
 	if err != nil {
 		newErrorResponse(c, http.StatusInternalServerError, err.Error())
@@ -151,18 +153,18 @@ func (h *Handler) addLogoProject(c *gin.Context) {
 	projectUuid := c.PostForm("uuid")
 
 	newFilename := uuid.NewV4().String()
-	filepath := "public/project/" + newFilename
+	filepath := pathConstant.PUBLIC_PROJECT + newFilename
 
-	userId, domainId, err := getContextUserInfo(c)
+	userId, _, domainId, err := getContextUserInfo(c)
 	if err != nil {
 		newErrorResponse(c, http.StatusForbidden, err.Error())
 		return
 	}
 
-	data, err := h.services.Project.AddLogoProject(
+	data, err := h.services.Project.ProjectUpdateImage(
 		userId,
 		domainId,
-		projectModel.ProjectLogoModel{
+		projectModel.ProjectImageModel{
 			Filepath: filepath,
 			Uuid:     projectUuid,
 		},
@@ -175,5 +177,46 @@ func (h *Handler) addLogoProject(c *gin.Context) {
 	}
 
 	c.SaveUploadedFile(fileImg, filepath)
+	c.JSON(http.StatusOK, data)
+}
+
+// @Summary ProjectUpdate
+// @Tags project
+// @Description Обновление информации о проекте в компании
+// @ID project-update
+// @Accept  json
+// @Produce  json
+// @Success 200 {object} projectModel.ProjectUpdateModel "data"
+// @Failure 400,404 {object} errorResponse
+// @Failure 500 {object} errorResponse
+// @Failure default {object} errorResponse
+// @Router /company/project/update [post]
+func (h *Handler) projectUpdate(c *gin.Context) {
+	var input projectModel.ProjectUpdateModel
+
+	if err := c.BindJSON(&input); err != nil {
+		newErrorResponse(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	userId, _, domainId, err := getContextUserInfo(c)
+	if err != nil {
+		newErrorResponse(c, http.StatusForbidden, err.Error())
+		return
+	}
+
+	data, err := h.services.Project.ProjectUpdate(
+		userModel.UserIdentityModel{
+			UserId:   userId,
+			DomainId: domainId,
+		},
+		input,
+	)
+
+	if err != nil {
+		newErrorResponse(c, http.StatusForbidden, err.Error())
+		return
+	}
+
 	c.JSON(http.StatusOK, data)
 }

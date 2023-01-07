@@ -43,7 +43,12 @@ func (s *AuthService) LoginUserOAuth2(code string) (userModel.UserAuthDataModel,
 	return s.repo.LoginUserOAuth2(code)
 }
 
-/* Refresh tokens for user */
+/**
+ * Функция для обновления токена доступа по токену обновления
+ * @param {userModel.TokenLogoutDataModel} data - Подробная информация об авторизационной информации пользователя
+ * @param {string} refreshToken - Токен обновления
+ * @returns {userModel.UserAuthDataModel, error} Пара токенов (access и refresh) или ошибка
+ */
 func (s *AuthService) Refresh(data userModel.TokenLogoutDataModel, refreshToken string) (userModel.UserAuthDataModel, error) {
 	token, err := s.tokenService.ParseTokenWithoutValid(refreshToken, viper.GetString("token.signing_key_refresh"))
 

@@ -13,6 +13,19 @@ type ProjectModel struct {
 	Managers    []UserEmailModel `json:"managers" binding:"required"`
 }
 
+/* Model data for request update project in company */
+type ProjectUpdateModel struct {
+	Uuid        string           `json:"uuid" binding:"required"`
+	Title       string           `json:"title" binding:"required"`
+	Description string           `json:"description" binding:"required"`
+	Managers    []UserEmailModel `json:"managers" binding:"required"`
+}
+
+type ProjectImageModel struct {
+	Filepath string `json:"filepath" binding:"required" db:"filepath"`
+	Uuid     string `json:"uuid" binding:"required"`
+}
+
 type ProjectDataModel struct {
 	Logo        *string          `json:"logo" db:"logo"`
 	Title       string           `json:"title" binding:"required" db:"title"`
@@ -30,11 +43,6 @@ type ProjectDbDataEx struct {
 	Uuid      string           `json:"uuid" db:"uuid"`
 	Data      ProjectDataModel `json:"data" db:"data"`
 	CreatedAt time.Time        `json:"created_at" db:"created_at"`
-}
-
-type ProjectLogoModel struct {
-	Filepath string `json:"filepath" binding:"required" db:"filepath"`
-	Uuid     string `json:"uuid" binding:"required"`
 }
 
 type ProjectUuidModel struct {

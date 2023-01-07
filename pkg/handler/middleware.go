@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/viper"
 )
 
+/* Идентификация пользователя */
 func (h *Handler) userIdentity(c *gin.Context) {
 	header := c.GetHeader(middlewareConstants.AUTHORIZATION_HEADER)
 
@@ -20,8 +21,8 @@ func (h *Handler) userIdentity(c *gin.Context) {
 	}
 
 	headerParts := strings.Split(header, " ")
-	if len(headerParts) != 2 {
-		newErrorResponse(c, http.StatusUnauthorized, "Не корректный авторизационный заголовок!")
+	if (len(headerParts) != 2) || (headerParts[1] == "null") || (headerParts[1] == "undefined") {
+		newErrorResponse(c, http.StatusUnauthorized, "Пользователь не авторизован!")
 		return
 	}
 
@@ -53,6 +54,7 @@ func (h *Handler) userIdentity(c *gin.Context) {
 
 	// Добавление к контексту дополнительных данных о пользователе
 	c.Set(middlewareConstants.USER_CTX, data.UsersId)
+	c.Set(middlewareConstants.USER_UUID_CTX, data.UsersUuid)
 	c.Set(middlewareConstants.AUTH_TYPE_VALUE_CTX, data.AuthType.Value)
 	c.Set(middlewareConstants.TOKEN_API_CTX, data.TokenApi)
 	c.Set(middlewareConstants.ACCESS_TOKEN_CTX, headerParts[1])
@@ -82,6 +84,7 @@ func (h *Handler) userIdentityLogout(c *gin.Context) {
 
 	// Добавление к контексту дополнительных данных о пользователе
 	c.Set(middlewareConstants.USER_CTX, data.UsersId)
+	c.Set(middlewareConstants.USER_UUID_CTX, data.UsersUuid)
 	c.Set(middlewareConstants.AUTH_TYPE_VALUE_CTX, data.AuthType.Value)
 	c.Set(middlewareConstants.TOKEN_API_CTX, data.TokenApi)
 	c.Set(middlewareConstants.ACCESS_TOKEN_CTX, headerParts[1])
@@ -102,25 +105,31 @@ func getUserId(c *gin.Context) (int, error) {
 }
 
 /* Function for get information user with gin.Context */
-func getContextUserInfo(c *gin.Context) (int, int, error) {
+func getContextUserInfo(c *gin.Context) (int, string, int, error) {
 	usersId, exist := c.Get(middlewareConstants.USER_CTX)
 
 	if !exist {
-		return -1, -1, errors.New("Нет доступа!")
+		return -1, "", -1, errors.New("Нет доступа!")
+	}
+
+	usersUuid, exist := c.Get(middlewareConstants.USER_UUID_CTX)
+
+	if !exist {
+		return -1, "", -1, errors.New("Нет доступа!")
 	}
 
 	domainsId, exist := c.Get(middlewareConstants.DOMAINS_ID)
 
 	if !exist {
-		return -1, -1, errors.New("Нет доступа!")
+		return -1, "", -1, errors.New("Нет доступа!")
 	}
 
-	return usersId.(int), domainsId.(int), nil
+	return usersId.(int), usersUuid.(string), domainsId.(int), nil
 }
 
 func (h *Handler) userIdentityHasRoles(exp string, roles ...string) func(c *gin.Context) {
 	return func(c *gin.Context) {
-		usersId, domainsId, err := getContextUserInfo(c)
+		usersId, _, domainsId, err := getContextUserInfo(c)
 		if err != nil {
 			newErrorResponse(c, http.StatusForbidden, "Нет доступа!")
 			return
@@ -168,7 +177,7 @@ func (h *Handler) userIdentityHasRoles(exp string, roles ...string) func(c *gin.
 
 func (h *Handler) userIdentityHasRole(role string) func(c *gin.Context) {
 	return func(c *gin.Context) {
-		usersId, domainsId, err := getContextUserInfo(c)
+		usersId, _, domainsId, err := getContextUserInfo(c)
 		if err != nil {
 			newErrorResponse(c, http.StatusForbidden, "Нет доступа!")
 			return

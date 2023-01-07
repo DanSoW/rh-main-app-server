@@ -243,7 +243,7 @@ func main() {
 	dns := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s",
 		viper.GetString("db.host"),
 		viper.GetString("db.username"),
-		os.Getenv("DB_PASSWORD"),
+		"iJ#Q@LKpkawf-)$1l25,m12l5kkm<TNN@IY)*DGjnlQ#BN",
 		viper.GetString("db.dbname"),
 		viper.GetString("db.port"),
 		viper.GetString("db.sslmode"),

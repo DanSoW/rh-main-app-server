@@ -606,8 +606,12 @@ func (r *AuthPostgres) LoginUserOAuth2(code string) (userModel.UserAuthDataModel
 	}, tx.Commit()
 }
 
-/*
-* Функция обновления токена доступа
+/**
+ * Функция для обновления токена доступа по токену обновления
+ * @param {userModel.TokenLogoutDataModel} data - Подробная информация об авторизационной информации пользователя
+ * @param {string} rToken - Токен обновления (refresh token)
+ * @param {token userModel.TokenOutputParse} token - Данные, полученные после дешифровки токена доступа вне зависимости от его валидности
+ * @returns {userModel.UserAuthDataModel, error} Пара токенов (access и refresh) или ошибка
  */
 func (r *AuthPostgres) Refresh(data userModel.TokenLogoutDataModel, rToken string, token userModel.TokenOutputParse) (userModel.UserAuthDataModel, error) {
 	user, err := r.userPostgres.GetUser("id", token.UsersId)

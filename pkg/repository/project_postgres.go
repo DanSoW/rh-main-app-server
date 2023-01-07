@@ -81,14 +81,14 @@ func (r *ProjectPostgres) CreateProject(userId, domainId int, data projectModel.
 		return projectModel.ProjectModel{}, err
 	}
 
-	roleAdmin, err := r.role.GetRole("value", roleConstant.ROLE_BUILDER_MANAGER)
+	roleBuilderManager, err := r.role.GetRole("value", roleConstant.ROLE_BUILDER_MANAGER)
 	if err != nil {
 		tx.Rollback()
 		return projectModel.ProjectModel{}, err
 	}
 
-	roleAdminJson, err := json.Marshal(worker.WorkerModel{
-		Role: roleAdmin.Uuid,
+	roleBuilderManagerJson, err := json.Marshal(worker.WorkerModel{
+		Role: roleBuilderManager.Uuid,
 	})
 
 	if err != nil {
@@ -111,8 +111,12 @@ func (r *ProjectPostgres) CreateProject(userId, domainId int, data projectModel.
 			return projectModel.ProjectModel{}, err
 		}
 
+		queryFindWorker := fmt.Sprintf("SELECT * FROM %s tl WHERE tl.users_id = $1", tableConstant.WORKERS_TABLE)
+		var workers []int
+		err = r.db.Select(&workers, queryFindWorker, user.Id)
+
 		var workerId int
-		row = tx.QueryRow(query, uuid.NewV4().String(), roleAdminJson, currentDate, currentDate, user.Id, companyId)
+		row = tx.QueryRow(query, uuid.NewV4().String(), roleBuilderManagerJson, currentDate, currentDate, user.Id, companyId)
 		if err := row.Scan(&workerId); err != nil {
 			tx.Rollback()
 			return projectModel.ProjectModel{}, err
@@ -141,6 +145,8 @@ func (r *ProjectPostgres) CreateProject(userId, domainId int, data projectModel.
 		tx.Rollback()
 		return projectModel.ProjectModel{}, err
 	}
+
+	fmt.Println(typesObjects.Id)
 
 	query = fmt.Sprintf(`INSERT INTO %s (value, types_objects_id) values ($1, $2)`, tableConstant.OBJECTS_TABLE)
 
@@ -227,10 +233,10 @@ func (r *ProjectPostgres) CreateProject(userId, domainId int, data projectModel.
 }
 
 /* Add logo project */
-func (r *ProjectPostgres) AddLogoProject(userId, domainId int, data projectModel.ProjectLogoModel) (projectModel.ProjectLogoModel, error) {
+func (r *ProjectPostgres) ProjectUpdateImage(userId, domainId int, data projectModel.ProjectImageModel) (projectModel.ProjectImageModel, error) {
 	tx, err := r.db.Begin()
 	if err != nil {
-		return projectModel.ProjectLogoModel{}, err
+		return projectModel.ProjectImageModel{}, err
 	}
 
 	userIdStr := strconv.Itoa(userId)
@@ -240,12 +246,12 @@ func (r *ProjectPostgres) AddLogoProject(userId, domainId int, data projectModel
 	access, err := r.enforcer.Enforce(userIdStr, domainIdStr, data.Uuid, actionConstant.MODIFY)
 	if err != nil {
 		tx.Rollback()
-		return projectModel.ProjectLogoModel{}, err
+		return projectModel.ProjectImageModel{}, err
 	}
 
 	if !access {
 		tx.Rollback()
-		return projectModel.ProjectLogoModel{}, errors.New("Ошибка! Нет доступа!")
+		return projectModel.ProjectImageModel{}, errors.New("Ошибка! Нет доступа!")
 	}
 
 	// Update logo for project
@@ -254,13 +260,13 @@ func (r *ProjectPostgres) AddLogoProject(userId, domainId int, data projectModel
 	_, err = r.db.Exec(query, data.Filepath, data.Uuid)
 	if err != nil {
 		tx.Rollback()
-		return projectModel.ProjectLogoModel{}, err
+		return projectModel.ProjectImageModel{}, err
 	}
 
 	err = tx.Commit()
 	if err != nil {
 		tx.Rollback()
-		return projectModel.ProjectLogoModel{}, err
+		return projectModel.ProjectImageModel{}, err
 	}
 
 	return data, nil
@@ -280,7 +286,7 @@ func (r *ProjectPostgres) GetProject(userId, domainId int, data projectModel.Pro
 	return project, nil
 }
 
-/* Get information about any count projects */
+/* Получение информации обо всех проектах */
 func (r *ProjectPostgres) GetProjects(userId, domainId int, data projectModel.ProjectCountModel) (projectModel.ProjectAnyCountModel, error) {
 	query := fmt.Sprintf("SELECT id FROM %s WHERE uuid=$1", tableConstant.COMPANIES_TABLE)
 	var companyId int
@@ -384,4 +390,63 @@ func (r *ProjectPostgres) GetProjectManagers(userId, domainId int, data projectM
 		Projects: projectsEx[data.Count:sum],
 		Count:    (sum - data.Count),
 	}, nil
+}
+
+func (r *ProjectPostgres) ProjectUpdate(user userModel.UserIdentityModel, data projectModel.ProjectUpdateModel) (projectModel.ProjectUpdateModel, error) {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return projectModel.ProjectUpdateModel{}, err
+	}
+
+	userIdStr := strconv.Itoa(user.UserId)
+	domainIdStr := strconv.Itoa(user.DomainId)
+
+	// Check access for user
+	access, err := r.enforcer.Enforce(userIdStr, domainIdStr, data.Uuid, actionConstant.MODIFY)
+	if err != nil {
+		tx.Rollback()
+		return projectModel.ProjectUpdateModel{}, err
+	}
+
+	if !access {
+		tx.Rollback()
+		return projectModel.ProjectUpdateModel{}, errors.New("Ошибка! Нет доступа!")
+	}
+
+	var projectInfo []projectModel.ProjectDbModel
+	query := fmt.Sprintf("SELECT uuid, data, created_at FROM %s WHERE uuid=$1 LIMIT 1", tableConstant.PROJECTS_TABLE)
+
+	err = r.db.Select(&projectInfo, query, data.Uuid)
+	if err != nil {
+		return projectModel.ProjectUpdateModel{}, err
+	}
+
+	var projectData projectModel.ProjectDataModel
+	err = json.Unmarshal([]byte(projectInfo[0].Data), &projectData)
+
+	projectData.Description = data.Description
+	projectData.Title = data.Title
+	// projectData.Managers = data.Managers (need make)
+
+	projectDataJson, err := json.Marshal(projectData)
+	if err != nil {
+		tx.Rollback()
+		return projectModel.ProjectUpdateModel{}, err
+	}
+
+	query = fmt.Sprintf("UPDATE %s tl SET data=$1 WHERE tl.uuid=$2", tableConstant.PROJECTS_TABLE)
+
+	_, err = tx.Exec(query, projectDataJson, data.Uuid)
+	if err != nil {
+		tx.Rollback()
+		return projectModel.ProjectUpdateModel{}, err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		tx.Rollback()
+		return projectModel.ProjectUpdateModel{}, err
+	}
+
+	return data, nil
 }

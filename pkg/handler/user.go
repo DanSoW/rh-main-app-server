@@ -84,7 +84,7 @@ func (h *Handler) updateProfile(c *gin.Context) {
 // @Failure default {object} errorResponse
 // @Router /user/company/get [post]
 func (h *Handler) getUserCompany(c *gin.Context) {
-	userId, domainId, err := getContextUserInfo(c)
+	userId, _, domainId, err := getContextUserInfo(c)
 	if err != nil {
 		newErrorResponse(c, http.StatusForbidden, err.Error())
 		return
@@ -103,6 +103,37 @@ func (h *Handler) getUserCompany(c *gin.Context) {
 	}
 }
 
+// @Summary GetUserRoles
+// @Tags profile
+// @Description Получение информации о всех ролях пользователя
+// @ID user-role-get-all
+// @Accept  json
+// @Produce  json
+// @Success 200 {object} company.CompanyDbModelEx "data"
+// @Failure 400,404 {object} errorResponse
+// @Failure 500 {object} errorResponse
+// @Failure default {object} errorResponse
+// @Router /user/role/get/all [post]
+func (h *Handler) getUserRoles(c *gin.Context) {
+	userId, _, domainId, err := getContextUserInfo(c)
+	if err != nil {
+		newErrorResponse(c, http.StatusForbidden, err.Error())
+		return
+	}
+
+	data, err := h.services.User.GetAllRoles(userModel.UserIdentityModel{
+		UserId:   userId,
+		DomainId: domainId,
+	})
+
+	if err != nil {
+		newErrorResponse(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	c.JSON(http.StatusOK, data)
+}
+
 // @Summary CheckAccess
 // @Tags profile
 // @Description Проверка пользовательских прав на подключение к тому или иному административному модулю
@@ -115,7 +146,7 @@ func (h *Handler) getUserCompany(c *gin.Context) {
 // @Failure default {object} errorResponse
 // @Router /user/access/check [post]
 func (h *Handler) accessCheck(c *gin.Context) {
-	userId, domainId, err := getContextUserInfo(c)
+	userId, _, domainId, err := getContextUserInfo(c)
 	if err != nil {
 		newErrorResponse(c, http.StatusForbidden, err.Error())
 		return

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	roleConstant "main-server/pkg/constant/role"
 
 	"github.com/gin-contrib/cors"
@@ -30,16 +31,16 @@ func NewHandler(services *service.Service) *Handler {
 func (h *Handler) InitRoutes() *gin.Engine {
 	router := gin.New()
 
-	// Set max multipart memory
+	// Установка максимального размера тела Multipart
 	router.MaxMultipartMemory = 50 << 20 // 50 MiB
 
-	// Set folder for storage static files
+	// Установка статической директории
 	router.Static("/public", "./public")
 
-	// Set global folder for load html
+	// Установка глобального каталога для хранения HTML-страниц
 	router.LoadHTMLGlob("pkg/template/*")
 
-	// Settings cors policies
+	// Установка CORS-политик
 	router.Use(cors.New(cors.Config{
 		//AllowAllOrigins: true,
 		AllowOrigins:     []string{viper.GetString("client_url")},
@@ -82,11 +83,25 @@ func (h *Handler) InitRoutes() *gin.Engine {
 		auth.POST(route.AUTH_RESET_PASSWORD, h.resetPassword)
 	}
 
+	// URL: /service
+	service := router.Group(route.SERVICE, h.userIdentity)
+	{
+		// URL: /main
+		main := service.Group(route.SERVICE_MAIN)
+		{
+			// URL: /verify
+			main.POST(route.SERVICE_VERIFY, h.serviceMainVerify)
+		}
+	}
+
 	// URL: /user
 	user := router.Group(route.USER_MAIN_ROUTE, h.userIdentity)
 	{
 		// URL: /user/access/check
 		user.POST(route.USER_CHECK_ACCESS_ROUTE, h.accessCheck)
+
+		// URL: /user/role/get/all
+		user.POST(route.USER_ROLES+"/"+route.GET_ALL_ROUTE, h.getUserRoles)
 
 		// URL: /user/profile
 		profile := user.Group(route.USER_PROFILE_ROUTE)
@@ -137,8 +152,27 @@ func (h *Handler) InitRoutes() *gin.Engine {
 			// URL: /company/project/create
 			project.POST(route.CREATE_ROUTE, h.userIdentityHasRole(roleConstant.ROLE_BUILDER_ADMIN), h.createProject)
 
-			// URL: /company/project/add/logo
-			project.POST(route.PROJECT_ADD_LOGO_ROUTE, h.userIdentityHasRole(roleConstant.ROLE_BUILDER_ADMIN), h.addLogoProject)
+			// URL: /company/project/update
+			project.POST(
+				route.UPDATE_ROUTE,
+				h.userIdentityHasRoles(
+					"OR",
+					roleConstant.ROLE_BUILDER_MANAGER,
+					roleConstant.ROLE_BUILDER_ADMIN,
+				),
+				h.projectUpdate,
+			)
+
+			// URL: /company/project/update/image
+			project.POST(
+				fmt.Sprintf("%s/%s", route.UPDATE_ROUTE, route.RESOURCE_IMAGE_ROUTE),
+				h.userIdentityHasRoles(
+					"OR",
+					roleConstant.ROLE_BUILDER_MANAGER,
+					roleConstant.ROLE_BUILDER_ADMIN,
+				),
+				h.projectUpdateImage,
+			)
 
 			// URL: /company/project/get
 			project.POST(route.GET_ROUTE, h.getProject)
@@ -152,10 +186,37 @@ func (h *Handler) InitRoutes() *gin.Engine {
 		{
 			// URL: /company/manager/get/all
 			manager.POST(route.GET_ALL_ROUTE, h.userIdentityHasRole(roleConstant.ROLE_BUILDER_ADMIN), h.getManagers)
+
+			// URL: /company/manager/get
+			manager.POST(route.GET_ROUTE, h.companyGetManager)
 		}
 
 		// URL: /company/create
 		company.POST(route.CREATE_ROUTE, h.userIdentityHasRole(roleConstant.ROLE_ADMIN), h.createCompany)
+
+		// URL: /company/update/image
+		company.POST(fmt.Sprintf("%s/%s", route.UPDATE_ROUTE, route.RESOURCE_IMAGE_ROUTE),
+			h.userIdentityHasRoles(
+				"OR",
+				roleConstant.ROLE_BUILDER_ADMIN,
+				roleConstant.ROLE_ADMIN,
+				roleConstant.ROLE_MANAGER,
+				roleConstant.ROLE_SUPER_ADMIN,
+			),
+			h.companyUpdateImage,
+		)
+
+		// URL: /company/update
+		company.POST(route.UPDATE_ROUTE,
+			h.userIdentityHasRoles(
+				"OR",
+				roleConstant.ROLE_BUILDER_ADMIN,
+				roleConstant.ROLE_ADMIN,
+				roleConstant.ROLE_MANAGER,
+				roleConstant.ROLE_SUPER_ADMIN,
+			),
+			h.companyUpdate,
+		)
 	}
 
 	return router

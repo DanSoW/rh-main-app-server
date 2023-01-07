@@ -2,7 +2,8 @@ package handler
 
 import (
 	config "main-server/config"
-	middlewareConstants "main-server/pkg/constant/middleware"
+	middlewareConstant "main-server/pkg/constant/middleware"
+	pathConstant "main-server/pkg/constant/path"
 	userModel "main-server/pkg/model/user"
 	"net/http"
 
@@ -11,8 +12,8 @@ import (
 	"github.com/spf13/viper"
 )
 
-// @Summary SignUp
-// @Tags auth
+// @Summary Регистрация нового пользователя
+// @Tags API для авторизации и регистрации пользователя
 // @Description Регистрация нового пользователя
 // @ID auth-sign-up
 // @Accept  json
@@ -47,9 +48,9 @@ func (h *Handler) signUp(c *gin.Context) {
 	})
 }
 
-// @Summary UploadProfileImage
-// @Tags auth
-// @Description Загрузка пользовательского изображения (аватар)
+// @Summary Загрузка пользовательского изображения
+// @Tags API для авторизации и регистрации пользователя
+// @Description Загрузка пользовательского изображения
 // @ID auth-sign-up-upload-image
 // @Accept  json
 // @Produce  json
@@ -70,7 +71,7 @@ func (h *Handler) uploadProfileImage(c *gin.Context) {
 	images := form.File["file"]
 	profileImage := images[len(images)-1]
 
-	filepath := "public/profile/" + uuid.NewV4().String()
+	filepath := pathConstant.PUBLIC_USER + uuid.NewV4().String()
 
 	// Save profile image
 	c.SaveUploadedFile(profileImage, filepath)
@@ -87,8 +88,8 @@ func (h *Handler) uploadProfileImage(c *gin.Context) {
 	})
 }
 
-// @Summary SignIn
-// @Tags auth
+// @Summary Авторизация пользователя
+// @Tags API для авторизации и регистрации пользователя
 // @Description Авторизация пользователя
 // @ID auth-sign-in
 // @Accept  json
@@ -123,9 +124,9 @@ func (h *Handler) signIn(c *gin.Context) {
 	})
 }
 
-// @Summary SignInVK
-// @Tags auth
-// @Description Авторизация пользователя через VK
+// @Summary Авторизация пользователя через VK (no work)
+// @Tags API для авторизации и регистрации пользователя
+// @Description Авторизация пользователя через VK (no work)
 // @ID auth-sign-in-vk
 // @Accept  json
 // @Produce  json
@@ -159,8 +160,8 @@ func (h *Handler) signInVK(c *gin.Context) {
 	})
 }
 
-// @Summary SignInOAuth2
-// @Tags auth
+// @Summary Авторизация пользователя через Google OAuth2
+// @Tags API для авторизации и регистрации пользователя
 // @Description Авторизация пользователя через Google OAuth2
 // @ID auth-sign-in-oauth2
 // @Accept  json
@@ -200,19 +201,21 @@ func (h *Handler) signInOAuth2(c *gin.Context) {
 	})
 }
 
-// @Summary Refresh
-// @Tags auth
-// @Description Обновление токена доступа и токена обновления
+// @Summary Обновление токена доступа
+// @Tags API для авторизации и регистрации пользователя
+// @Description Обновление токена доступа
 // @ID auth-refresh
 // @Accept  json
 // @Produce  json
-// @Param input body userModel.TokenRefreshModel true "credentials"
+// @Param Authorization header string true "Токен доступа для текущего пользователя" example(Bearer access_token)
 // @Success 200 {object} userModel.TokenAccessModel "data"
 // @Failure 400,404 {object} errorResponse
 // @Failure 500 {object} errorResponse
 // @Failure default {object} errorResponse
 // @Router /auth/refresh [post]
 func (h *Handler) refresh(c *gin.Context) {
+
+	// Получение токена обновления из файла cookie
 	refreshToken, err := c.Cookie(viper.GetString("environment.refresh_token_key"))
 
 	if err != nil {
@@ -220,10 +223,12 @@ func (h *Handler) refresh(c *gin.Context) {
 		return
 	}
 
-	accessToken, _ := c.Get(middlewareConstants.ACCESS_TOKEN_CTX)
-	authTypeValue, _ := c.Get(middlewareConstants.AUTH_TYPE_VALUE_CTX)
-	tokenApi, _ := c.Get(middlewareConstants.TOKEN_API_CTX)
+	// Получение дополнительной авторизационной информации пользователя (после работы middleware цепочки)
+	accessToken, _ := c.Get(middlewareConstant.ACCESS_TOKEN_CTX)
+	authTypeValue, _ := c.Get(middlewareConstant.AUTH_TYPE_VALUE_CTX)
+	tokenApi, _ := c.Get(middlewareConstant.TOKEN_API_CTX)
 
+	// Обновление токена доступа
 	data, err := h.services.Authorization.Refresh(userModel.TokenLogoutDataModel{
 		AccessToken:   accessToken.(string),
 		RefreshToken:  refreshToken,
@@ -236,6 +241,7 @@ func (h *Handler) refresh(c *gin.Context) {
 		return
 	}
 
+	// Установка нового токена обновления (необходимо, если токен обновления изменился)
 	c.SetCookie(viper.GetString("environment.refresh_token_key"), data.RefreshToken,
 		30*24*60*60*1000, "/", viper.GetString("environment.domain"), false, true)
 	c.SetSameSite(config.HTTPSameSite)
@@ -249,12 +255,13 @@ type LogoutOutputModel struct {
 	IsLogout bool `json:"is_logout"`
 }
 
-// @Summary Logout
-// @Tags auth
+// @Summary Выход из аккаунта
+// @Tags API для авторизации и регистрации пользователя
 // @Description Выход из аккаунта
 // @ID auth-logout
 // @Accept  json
 // @Produce  json
+// @Param Authorization header string true "Токен доступа для текущего пользователя" example(Bearer access_token)
 // @Success 200 {object} LogoutOutputModel "data"
 // @Failure 400,404 {object} errorResponse
 // @Failure 500 {object} errorResponse
@@ -268,9 +275,9 @@ func (h *Handler) logout(c *gin.Context) {
 		return
 	}
 
-	accessToken, _ := c.Get(middlewareConstants.ACCESS_TOKEN_CTX)
-	authTypeValue, _ := c.Get(middlewareConstants.AUTH_TYPE_VALUE_CTX)
-	tokenApi, _ := c.Get(middlewareConstants.TOKEN_API_CTX)
+	accessToken, _ := c.Get(middlewareConstant.ACCESS_TOKEN_CTX)
+	authTypeValue, _ := c.Get(middlewareConstant.AUTH_TYPE_VALUE_CTX)
+	tokenApi, _ := c.Get(middlewareConstant.TOKEN_API_CTX)
 
 	data, err := h.services.Authorization.Logout(userModel.TokenLogoutDataModel{
 		AccessToken:   accessToken.(string),
@@ -295,8 +302,8 @@ func (h *Handler) logout(c *gin.Context) {
 	})
 }
 
-// @Summary Activate
-// @Tags auth
+// @Summary Активация аккаунта по почте
+// @Tags API для авторизации и регистрации пользователя
 // @Description Активация аккаунта по почте
 // @ID auth-activate
 // @Accept  json
@@ -319,8 +326,8 @@ func (h *Handler) activate(c *gin.Context) {
 	})
 }
 
-// @Summary Recovery password
-// @Tags auth
+// @Summary Запрос на смену пароля пользователем
+// @Tags API для авторизации и регистрации пользователя
 // @Description Запрос на смену пароля пользователем
 // @ID auth-recovery-password
 // @Accept  json
@@ -350,8 +357,8 @@ func (h *Handler) recoveryPassword(c *gin.Context) {
 	})
 }
 
-// @Summary Reset password
-// @Tags auth
+// @Summary Изменение пароля пользователем
+// @Tags API для авторизации и регистрации пользователя
 // @Description Изменение пароля пользователем
 // @ID auth-reset-password
 // @Accept  json

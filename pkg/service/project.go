@@ -2,6 +2,7 @@ package service
 
 import (
 	projectModel "main-server/pkg/model/project"
+	userModel "main-server/pkg/model/user"
 	repository "main-server/pkg/repository"
 )
 
@@ -22,9 +23,14 @@ func (s *ProjectService) CreateProject(userId, domainId int, data projectModel.P
 	return s.repo.CreateProject(userId, domainId, data)
 }
 
-/* Method for add logo to project */
-func (s *ProjectService) AddLogoProject(userId, domainId int, data projectModel.ProjectLogoModel) (projectModel.ProjectLogoModel, error) {
-	return s.repo.AddLogoProject(userId, domainId, data)
+/* Method for update project */
+func (s *ProjectService) ProjectUpdate(user userModel.UserIdentityModel, data projectModel.ProjectUpdateModel) (projectModel.ProjectUpdateModel, error) {
+	return s.repo.ProjectUpdate(user, data)
+}
+
+/* Method for update image for project */
+func (s *ProjectService) ProjectUpdateImage(userId, domainId int, data projectModel.ProjectImageModel) (projectModel.ProjectImageModel, error) {
+	return s.repo.ProjectUpdateImage(userId, domainId, data)
 }
 
 /* Method for get information about object */

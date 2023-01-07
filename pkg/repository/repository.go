@@ -48,6 +48,7 @@ type User interface {
 	UpdateProfile(c *gin.Context, data userModel.UserProfileUpdateDataModel) (userModel.UserJSONBModel, error)
 	GetUserCompany(userId, domainId int) (companyModel.CompanyDbModelEx, error)
 	AccessCheck(userId, domainId int, value rbacModel.RoleValueModel) (bool, error)
+	GetAllRoles(user userModel.UserIdentityModel) (*userModel.UserRoleModel, error)
 }
 
 type Admin interface {
@@ -60,14 +61,27 @@ type AuthType interface {
 }
 
 type Project interface {
+	/* CRUD */
 	CreateProject(userId, domainId int, data projectModel.ProjectModel) (projectModel.ProjectModel, error)
-	AddLogoProject(userId, domainId int, data projectModel.ProjectLogoModel) (projectModel.ProjectLogoModel, error)
+	ProjectUpdate(user userModel.UserIdentityModel, data projectModel.ProjectUpdateModel) (projectModel.ProjectUpdateModel, error)
+	ProjectUpdateImage(userId, domainId int, data projectModel.ProjectImageModel) (projectModel.ProjectImageModel, error)
+
 	GetProject(userId, domainId int, data projectModel.ProjectUuidModel) (projectModel.ProjectDbModel, error)
 	GetProjects(userId, domainId int, data projectModel.ProjectCountModel) (projectModel.ProjectAnyCountModel, error)
 }
 
 type Company interface {
 	GetManagers(userId, domainId int, data companyModel.ManagerCountModel) (companyModel.ManagerAnyCountModel, error)
+	GetManager(user userModel.UserIdentityModel, data companyModel.ManagerUuidModel) (companyModel.ManagerCompanyModel, error)
+
+	/* CRUD */
+	CompanyUpdateImage(user userModel.UserIdentityModel, data companyModel.CompanyImageModel) (companyModel.CompanyImageModel, error)
+	CompanyUpdate(user userModel.UserIdentityModel, data companyModel.CompanyUpdateModel) (companyModel.CompanyUpdateModel, error)
+}
+
+/* Обёртка над функционалом sqlx */
+type Wrapper interface {
+	GetOne(table string, column, value interface{}) (interface{}, error)
 }
 
 type Repository struct {
@@ -79,15 +93,18 @@ type Repository struct {
 	AuthType
 	Project
 	Company
+	Wrapper
 }
 
 func NewRepository(db *sqlx.DB, enforcer *casbin.Enforcer) *Repository {
+	wrapper := NewWrapperPostgres(db)
+
 	domain := NewDomainPostgres(db)
 	role := NewRolePostgres(db, enforcer)
 	user := NewUserPostgres(db, enforcer, domain, role)
 	admin := NewAdminPostgres(db, enforcer, domain, role)
 	project := NewProjectPostgres(db, enforcer, role)
-	company := NewCompanyPostgres(db, enforcer, role)
+	company := NewCompanyPostgres(db, enforcer, role, user, wrapper)
 
 	return &Repository{
 		Authorization: NewAuthPostgres(db, enforcer, *user),
@@ -98,5 +115,6 @@ func NewRepository(db *sqlx.DB, enforcer *casbin.Enforcer) *Repository {
 		AuthType:      NewAuthTypePostgres(db),
 		Project:       project,
 		Company:       company,
+		Wrapper:       wrapper,
 	}
 }

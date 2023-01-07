@@ -19,8 +19,6 @@ type Authorization interface {
 	Refresh(data userModel.TokenLogoutDataModel, refreshToken string) (userModel.UserAuthDataModel, error)
 	Logout(tokens userModel.TokenLogoutDataModel) (bool, error)
 	Activate(link string) (bool, error)
-
-	// Recover password
 	RecoveryPassword(email string) (bool, error)
 	ResetPassword(data userModel.ResetPasswordModel) (bool, error)
 }
@@ -36,11 +34,11 @@ type AuthType interface {
 }
 
 type User interface {
-	// Profile
 	GetProfile(c *gin.Context) (userModel.UserProfileModel, error)
 	UpdateProfile(c *gin.Context, data userModel.UserProfileUpdateDataModel) (userModel.UserJSONBModel, error)
 	GetUserCompany(userId, domainId int) (companyModel.CompanyDbModelEx, error)
 	AccessCheck(userId, domainId int, value rbacModel.RoleValueModel) (bool, error)
+	GetAllRoles(user userModel.UserIdentityModel) (*userModel.UserRoleModel, error)
 }
 
 type Admin interface {
@@ -59,13 +57,17 @@ type Role interface {
 
 type Project interface {
 	CreateProject(userId, domainId int, data projectModel.ProjectModel) (projectModel.ProjectModel, error)
-	AddLogoProject(userId, domainId int, data projectModel.ProjectLogoModel) (projectModel.ProjectLogoModel, error)
+	ProjectUpdate(user userModel.UserIdentityModel, data projectModel.ProjectUpdateModel) (projectModel.ProjectUpdateModel, error)
+	ProjectUpdateImage(userId, domainId int, data projectModel.ProjectImageModel) (projectModel.ProjectImageModel, error)
 	GetProject(userId, domainId int, data projectModel.ProjectUuidModel) (projectModel.ProjectDbModel, error)
 	GetProjects(userId, domainId int, data projectModel.ProjectCountModel) (projectModel.ProjectAnyCountModel, error)
 }
 
 type Company interface {
 	GetManagers(userId, domainId int, data companyModel.ManagerCountModel) (companyModel.ManagerAnyCountModel, error)
+	GetManager(user userModel.UserIdentityModel, data companyModel.ManagerUuidModel) (companyModel.ManagerCompanyModel, error)
+	CompanyUpdateImage(user userModel.UserIdentityModel, data companyModel.CompanyImageModel) (companyModel.CompanyImageModel, error)
+	CompanyUpdate(user userModel.UserIdentityModel, data companyModel.CompanyUpdateModel) (companyModel.CompanyUpdateModel, error)
 }
 
 type Service struct {
