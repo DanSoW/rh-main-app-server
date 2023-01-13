@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"reflect"
 
 	model "main-server/pkg/module/excel_analysis/model"
 
@@ -23,6 +24,7 @@ type IExAnalysisKernel interface {
 	GetIndexNextRow(index model.IndexCellModel, sheet *spreadsheet.Sheet, predicat PredicatType) (model.IndexCellModel, error)
 	GetIndexNextRowOffset(index model.IndexCellModel, sheet *spreadsheet.Sheet, offset int, predicat PredicatType) (model.IndexCellModel, error)
 	GetLengthCells(index model.IndexCellModel, sheet *spreadsheet.Sheet, predicat PredicatType) int
+	GetValueCells(data *model.HeaderInfoModel, sheet *spreadsheet.Sheet, index model.IndexCellModel, place string) model.IndexCellModel
 }
 
 type ExAnalysisKernel struct {
@@ -47,21 +49,19 @@ func (k *ExAnalysisKernel) GetLengthCells(index model.IndexCellModel, sheet *spr
 		}
 	}
 
-	/*var result 0
+	var result int
+	result = 0
+
 	for i := index.Row; i < len(sheet.Rows); i++ {
 		cell := sheet.Rows[i][index.Column]
 		if predicat(cell.Value, i, index.Column) {
-			result = model.IndexCellModel{
-				Pos:    cell.Pos(),
-				Row:    i,
-				Column: index.Column,
-				Value:  cell.Value,
-			}
+			result++
+		} else {
 			break
 		}
-	}*/
+	}
 
-	return 0
+	return result
 }
 
 /* Получение подробной информации о ячейки в таблице по её значению */
@@ -144,66 +144,6 @@ func (k *ExAnalysisKernel) GetIndexNextRow(index model.IndexCellModel, sheet *sp
 	return result, nil
 }
 
-func (k *ExAnalysisKernel) GetHeaderInfo() (model.HeaderInfoModel, error) {
-	sheet, err := k.GetSheet()
-	if err != nil {
-		return model.HeaderInfoModel{}, err
-	}
-
-	var headerInfo model.HeaderInfoModel
-
-	// Определение индекса ячейки с указанием на основную информацию
-	index, _ := k.GetIndexByValue("Основная информация", sheet)
-	nextIndex1, _ := k.GetIndexNextRowOffset(index, sheet, 1, func(value string, row, column int) bool { return (len(value) > 0) })
-
-	headerInfo.Title = nextIndex1.Value
-
-	nextIndex2, _ := k.GetIndexNextRowOffset(nextIndex1, sheet, 1, func(value string, row, column int) bool { return (len(value) > 0) })
-	nextIndex2_RC := model.IndexCellModel{
-		Row:    nextIndex2.Row,
-		Column: (nextIndex2.Column + 1),
-	}
-
-	// Добавление информации об адресе
-	for i := 0; i < 2; i++ {
-		nextIndex2_RC.Row += i
-		next, _ := k.GetIndexNextRow(nextIndex2_RC, sheet, func(value string, row, column int) bool {
-			if len(value) <= 0 {
-				return false
-			}
-
-			if row == nextIndex2.Row {
-				return true
-			}
-
-			return (len(sheet.Rows[row][column-1].Value) <= 0)
-		})
-
-		headerInfo.AddressItem = append(headerInfo.AddressItem, next.Value)
-
-		fmt.Println(next.Value)
-	}
-
-	// Добавление названия объекта
-	//headerInfo.Title = sheet.Rows[index.Row+1][index.Column].Value
-
-	/*fmt.Printf("Row ID: %d, Column ID: %d, Value: %s\n", index.Row+1, index.Column, sheet.Rows[index.Row+1][index.Column].Value)
-	fmt.Printf("Row ID: %d, Column ID: %d, Value: %s\n", index.Row+2, index.Column, sheet.Rows[index.Row+2][index.Column].Value)
-	fmt.Printf("Row ID: %d, Column ID: %d, Value: %s\n", index.Row+4, index.Column, sheet.Rows[index.Row+4][index.Column].Value)*/
-
-	// Копирование данных из одной таблицы в другую
-	/*for rInd, row := range sheet.Rows {
-		for cInd, cell := range row {
-			if rInd < 20 {
-				fmt.Printf("rInd: %d, cInd: %d, value: %s\n", rInd, cInd, cell.Value)
-				fmt.Println(cell.Note)
-			}
-		}
-	}*/
-
-	return model.HeaderInfoModel{}, nil
-}
-
 /* Получение указателя на объект листа */
 func (k *ExAnalysisKernel) GetSheet() (*spreadsheet.Sheet, error) {
 	// Чтение данных из файла
@@ -262,4 +202,87 @@ func (k *ExAnalysisKernel) CopyTo(filePath string) (bool, error) {
 	}
 
 	return true, nil
+}
+
+/* Получение информации о ячейках и её загрузка в структуру */
+func (k *ExAnalysisKernel) GetValueCells(data *model.HeaderInfoModel, sheet *spreadsheet.Sheet, index model.IndexCellModel, place string) model.IndexCellModel {
+	nextIndex, _ := k.GetIndexNextRowOffset(index, sheet, 1, func(value string, row, column int) bool { return (len(value) > 0) })
+	nextIndex_RC := model.IndexCellModel{
+		Row:    nextIndex.Row,
+		Column: (nextIndex.Column + 1),
+	}
+
+	indexLen := k.GetLengthCells(nextIndex_RC, sheet, func(value string, row, column int) bool {
+		if len(value) <= 0 {
+			return false
+		}
+
+		if row == nextIndex.Row {
+			return true
+		}
+
+		return (len(sheet.Rows[row][column-1].Value) <= 0)
+	})
+
+	ps := reflect.ValueOf(data)
+	s := ps.Elem()
+	var reflectValue reflect.Value
+
+	if s.Kind() == reflect.Struct {
+		reflectValue = s.FieldByName(place)
+
+		if !(reflectValue.IsValid() && reflectValue.CanSet()) {
+			return model.IndexCellModel{}
+		}
+	} else {
+		return model.IndexCellModel{}
+	}
+
+	for i := 0; i < indexLen; i++ {
+		nextIndex_RC.Row += i
+		next, _ := k.GetIndexNextRow(nextIndex_RC, sheet, func(value string, row, column int) bool {
+			if len(value) <= 0 {
+				return false
+			}
+
+			if row == nextIndex.Row {
+				return true
+			}
+
+			return (len(sheet.Rows[row][column-1].Value) <= 0)
+		})
+
+		if reflectValue.Kind() == reflect.String {
+			reflectValue.SetString(next.Value)
+		} else if reflectValue.Kind() == reflect.Slice {
+			reflectValue.Set(reflect.Append(reflectValue, reflect.ValueOf(next.Value)))
+		}
+	}
+
+	return nextIndex
+}
+
+func (k *ExAnalysisKernel) GetHeaderInfo() (model.HeaderInfoModel, error) {
+	sheet, err := k.GetSheet()
+	if err != nil {
+		return model.HeaderInfoModel{}, err
+	}
+
+	var headerInfo model.HeaderInfoModel
+
+	// Определение индекса ячейки с указанием на основную информацию
+	index, _ := k.GetIndexByValue("Основная информация", sheet)
+	var nextIndex model.IndexCellModel
+	nextIndex, _ = k.GetIndexNextRowOffset(index, sheet, 1, func(value string, row, column int) bool { return (len(value) > 0) })
+
+	headerInfo.Title = nextIndex.Value
+
+	// Заполнение полей структуры (начиная с адреса)
+	t := reflect.TypeOf(headerInfo)
+
+	for i := 1; i < t.NumField(); i++ {
+		nextIndex = k.GetValueCells(&headerInfo, sheet, nextIndex, t.Field(i).Name)
+	}
+
+	return headerInfo, nil
 }
