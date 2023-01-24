@@ -2,6 +2,8 @@ package handler
 
 import (
 	"encoding/json"
+	utilContext "main-server/pkg/handler/util"
+	httpModel "main-server/pkg/model/http"
 	rbacModel "main-server/pkg/model/rbac"
 	userModel "main-server/pkg/model/user"
 	"net/http"
@@ -17,15 +19,15 @@ import (
 // @Produce  json
 // @Param input body userModel.UserProfileDataModel true "credentials"
 // @Success 200 {object} userModel.UserProfileDataModel "data"
-// @Failure 400,404 {object} errorResponse
-// @Failure 500 {object} errorResponse
-// @Failure default {object} errorResponse
+// @Failure 400,404 {object} ResponseMessage
+// @Failure 500 {object} ResponseMessage
+// @Failure default {object} ResponseMessage
 // @Router /user/profile/get [post]
 func (h *Handler) getProfile(c *gin.Context) {
 	data, err := h.services.User.GetProfile(c)
 
 	if err != nil {
-		newErrorResponse(c, http.StatusInternalServerError, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -34,7 +36,7 @@ func (h *Handler) getProfile(c *gin.Context) {
 	err = json.Unmarshal([]byte(data.Data), &userProfile)
 
 	if err != nil {
-		newErrorResponse(c, http.StatusInternalServerError, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -51,21 +53,21 @@ func (h *Handler) getProfile(c *gin.Context) {
 // @Produce  json
 // @Param input body userModel.UserProfileUpdateDataModel true "credentials"
 // @Success 200 {object} userModel.UserJSONBModel "data"
-// @Failure 400,404 {object} errorResponse
-// @Failure 500 {object} errorResponse
-// @Failure default {object} errorResponse
+// @Failure 400,404 {object} ResponseMessage
+// @Failure 500 {object} ResponseMessage
+// @Failure default {object} ResponseMessage
 // @Router /user/profile/update [post]
 func (h *Handler) updateProfile(c *gin.Context) {
 	var input userModel.UserProfileUpdateDataModel
 
 	if err := c.BindJSON(&input); err != nil {
-		newErrorResponse(c, http.StatusBadRequest, "invalid input body")
+		utilContext.NewErrorResponse(c, http.StatusBadRequest, "invalid input body")
 		return
 	}
 
 	data, err := h.services.User.UpdateProfile(c, input)
 	if err != nil {
-		newErrorResponse(c, http.StatusInternalServerError, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -79,20 +81,20 @@ func (h *Handler) updateProfile(c *gin.Context) {
 // @Accept  json
 // @Produce  json
 // @Success 200 {object} company.CompanyDbModelEx "data"
-// @Failure 400,404 {object} errorResponse
-// @Failure 500 {object} errorResponse
-// @Failure default {object} errorResponse
+// @Failure 400,404 {object} ResponseMessage
+// @Failure 500 {object} ResponseMessage
+// @Failure default {object} ResponseMessage
 // @Router /user/company/get [post]
 func (h *Handler) getUserCompany(c *gin.Context) {
-	userId, _, domainId, err := getContextUserInfo(c)
+	userId, _, domainId, err := utilContext.GetContextUserInfo(c)
 	if err != nil {
-		newErrorResponse(c, http.StatusForbidden, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusForbidden, err.Error())
 		return
 	}
 
 	data, err := h.services.User.GetUserCompany(userId, domainId)
 	if err != nil {
-		newErrorResponse(c, http.StatusInternalServerError, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -110,14 +112,14 @@ func (h *Handler) getUserCompany(c *gin.Context) {
 // @Accept  json
 // @Produce  json
 // @Success 200 {object} company.CompanyDbModelEx "data"
-// @Failure 400,404 {object} errorResponse
-// @Failure 500 {object} errorResponse
-// @Failure default {object} errorResponse
+// @Failure 400,404 {object} ResponseMessage
+// @Failure 500 {object} ResponseMessage
+// @Failure default {object} ResponseMessage
 // @Router /user/role/get/all [post]
 func (h *Handler) getUserRoles(c *gin.Context) {
-	userId, _, domainId, err := getContextUserInfo(c)
+	userId, _, domainId, err := utilContext.GetContextUserInfo(c)
 	if err != nil {
-		newErrorResponse(c, http.StatusForbidden, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusForbidden, err.Error())
 		return
 	}
 
@@ -127,7 +129,7 @@ func (h *Handler) getUserRoles(c *gin.Context) {
 	})
 
 	if err != nil {
-		newErrorResponse(c, http.StatusInternalServerError, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -140,31 +142,31 @@ func (h *Handler) getUserRoles(c *gin.Context) {
 // @ID user-check-access
 // @Accept  json
 // @Produce  json
-// @Success 200 {object} BooleanResponse "data"
-// @Failure 400,404 {object} errorResponse
-// @Failure 500 {object} errorResponse
-// @Failure default {object} errorResponse
+// @Success 200 {object} httpModel.ResponseValue "data"
+// @Failure 400,404 {object} ResponseMessage
+// @Failure 500 {object} ResponseMessage
+// @Failure default {object} ResponseMessage
 // @Router /user/access/check [post]
 func (h *Handler) accessCheck(c *gin.Context) {
-	userId, _, domainId, err := getContextUserInfo(c)
+	userId, _, domainId, err := utilContext.GetContextUserInfo(c)
 	if err != nil {
-		newErrorResponse(c, http.StatusForbidden, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusForbidden, err.Error())
 		return
 	}
 
 	var input rbacModel.RoleValueModel
 	if err := c.Bind(&input); err != nil {
-		newErrorResponse(c, http.StatusBadRequest, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	data, err := h.services.User.AccessCheck(userId, domainId, input)
 	if err != nil {
-		newErrorResponse(c, http.StatusInternalServerError, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, BooleanResponse{
+	c.JSON(http.StatusOK, httpModel.ResponseValue{
 		Value: data,
 	})
 }

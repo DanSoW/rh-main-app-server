@@ -10,7 +10,6 @@ import (
 )
 
 func BuildMessage(mail email.Mail) string {
-
 	msg := ""
 	msg += fmt.Sprintf("from: %s\r\n", mail.Sender)
 
@@ -30,6 +29,15 @@ func SendMessage(to, message string) error {
 
 	err := smtp.SendMail(viper.GetString("smtp.host")+":"+viper.GetString("smtp.port"), auth,
 		viper.GetString("smtp.email"), []string{to}, []byte(message))
+
+	return err
+}
+
+func SendMessageToLot(to []string, message string) error {
+	auth := smtp.PlainAuth("", viper.GetString("smtp.email"), os.Getenv("SMTP_PASSWORD"), viper.GetString("smtp.host"))
+
+	err := smtp.SendMail(viper.GetString("smtp.host")+":"+viper.GetString("smtp.port"), auth,
+		viper.GetString("smtp.email"), to, []byte(message))
 
 	return err
 }

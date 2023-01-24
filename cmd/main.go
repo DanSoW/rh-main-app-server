@@ -14,17 +14,18 @@ import (
 	"os/signal"
 	"syscall"
 
+	// excel_analysis "main-server/pkg/module/excel_analysis"
+
 	"github.com/casbin/casbin/v2"
 	gormadapter "github.com/casbin/gorm-adapter/v3"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/writer"
+	"github.com/spf13/viper"
 	"golang.org/x/oauth2"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-
-	"github.com/spf13/viper"
 )
 
 // Retrieve a token, saves the token, then returns the generated client.
@@ -94,78 +95,14 @@ func saveToken(path string, token *oauth2.Token) {
 // @name Authorization
 
 func main() {
-	/*data, err := ioutil.ReadFile("./config/client_secret.json")
-	if err != nil {
-		logrus.Fatalf("error : %s", err.Error())
-	}
-	conf, err := google.JWTConfigFromJSON(data, sheets.SpreadsheetsScope)
-	if err != nil {
-		logrus.Fatalf("error : %s", err.Error())
-	}
+	// Тестовый код ядра анализа таблиц
+	/*exKernel := excel_analysis.NewExAnalysisKernel("./config/client_secret.json", "1MjTmlm-4Inf4u0kluKfuCcrSRId1CPbLVHTLGr3lFRU")
+	data, _ := exKernel.GetHeaderInfo()
+	dataStr, _ := json.Marshal(data)
 
-	client := conf.Client(context.Background())
-	srvSheets, err := sheets.New(client)
-	if err != nil {
-		logrus.Fatalf("error : %s", err.Error())
-	}
+	fmt.Println(string(dataStr))*/
 
-	spreadsheetID := "1m9_IhCWtlAuifx0zd1QZHxg_E6U_T_cFHlaxkdzODpo"
-	readRange := "A1:AC66"
-	resp, err := srvSheets.Spreadsheets.Values.Get(spreadsheetID, readRange).Do()
-
-	if err != nil {
-		logrus.Fatalf("error : %s", err.Error())
-	}
-
-	if len(resp.Values) == 0 {
-		fmt.Println("No data found.")
-	} else {
-		fmt.Println("Name, Major:")
-		for _, row := range resp.Values {
-			for _, cell := range row {
-				fmt.Printf("%s\n", cell)
-			}
-		}
-	}*/
-
-	/*data, err := ioutil.ReadFile("./config/client_secret.json")
-	if err != nil {
-		logrus.Fatalf("error : %s", err.Error())
-	}
-
-	conf, err := google.JWTConfigFromJSON(data, spreadsheet.Scope)
-	if err != nil {
-		logrus.Fatalf("error : %s", err.Error())
-	}
-
-	client := conf.Client(context.Background())
-
-	service2 := spreadsheet.NewServiceWithClient(client)
-	spreadsheet, err := service2.FetchSpreadsheet("1m9_IhCWtlAuifx0zd1QZHxg_E6U_T_cFHlaxkdzODpo")
-	if err != nil {
-		logrus.Fatalf("error : %s", err.Error())
-	}
-	sheet, err := spreadsheet.SheetByIndex(0)
-
-	if err != nil {
-		logrus.Fatalf("error : %s", err.Error())
-	}
-
-	f := excelize.NewFile()
-
-	for _, row := range sheet.Rows {
-		for _, cell := range row {
-
-			f.SetCellValue("Sheet1", cell.Pos(), cell.Value)
-			// f.SetCellStyle("Sheet1", )
-		}
-	}
-
-	if err := f.SaveAs("Book1.xlsx"); err != nil {
-		fmt.Println(err)
-	}*/
-
-	/* Init config */
+	// Инициализация конфигурации сервера
 	if err := initConfig(); err != nil {
 		logrus.Fatalf("error initializing configs: %s", err.Error())
 	}
@@ -174,7 +111,7 @@ func main() {
 		logrus.Fatalf("error loading env variable: %s", err.Error())
 	}
 
-	/* Init logger */
+	// Инициализация логгера
 	logrus.SetFormatter(new(logrus.JSONFormatter))
 
 	fileError, err := os.OpenFile(viper.GetString("paths.logs.error"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
@@ -190,6 +127,8 @@ func main() {
 		logrus.Error("Failed to log to file, using default stderr")
 	}
 
+	defer fileError.Close()
+
 	fileInfo, err := os.OpenFile(viper.GetString("paths.logs.info"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err == nil {
 		logrus.AddHook(&writer.Hook{
@@ -204,6 +143,8 @@ func main() {
 		logrus.Error("Failed to log to file, using default stderr")
 	}
 
+	defer fileInfo.Close()
+
 	fileWarn, err := os.OpenFile(viper.GetString("paths.logs.warn"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err == nil {
 		logrus.AddHook(&writer.Hook{
@@ -216,6 +157,8 @@ func main() {
 		logrus.SetOutput(os.Stderr)
 		logrus.Error("Failed to log to file, using default stderr")
 	}
+
+	defer fileWarn.Close()
 
 	fileFatal, err := os.OpenFile(viper.GetString("paths.logs.fatal"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err == nil {
@@ -230,7 +173,9 @@ func main() {
 		logrus.Error("Failed to log to file, using default stderr")
 	}
 
-	/* Connection in database */
+	defer fileFatal.Close()
+
+	// Создание нового подключения к БД
 	db, err := repository.NewPostgresDB(repository.Config{
 		Host:     viper.GetString("db.host"),
 		Port:     viper.GetString("db.port"),
@@ -240,6 +185,7 @@ func main() {
 		Password: os.Getenv("DB_PASSWORD"),
 	})
 
+	// Создание строки DNS
 	dns := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s",
 		viper.GetString("db.host"),
 		viper.GetString("db.username"),
@@ -309,26 +255,9 @@ func main() {
 	if err := db.Close(); err != nil {
 		logrus.Errorf("error occured on db connection close: %s", err.Error())
 	}
-
-	/* Closed files for logger */
-	if err := fileError.Close(); err != nil {
-		logrus.Error(err.Error())
-	}
-
-	if err := fileWarn.Close(); err != nil {
-		logrus.Error(err.Error())
-	}
-
-	if err := fileInfo.Close(); err != nil {
-		logrus.Error(err.Error())
-	}
-
-	if err := fileFatal.Close(); err != nil {
-		logrus.Error(err.Error())
-	}
 }
 
-// Init config
+/* Инициализация файлов конфигурации */
 func initConfig() error {
 	viper.AddConfigPath("config")
 	viper.SetConfigName("config")

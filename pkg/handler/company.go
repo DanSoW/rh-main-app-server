@@ -2,6 +2,7 @@ package handler
 
 import (
 	pathConstant "main-server/pkg/constant/path"
+	utilContext "main-server/pkg/handler/util"
 	companyModel "main-server/pkg/model/company"
 	userModel "main-server/pkg/model/user"
 	"net/http"
@@ -18,27 +19,27 @@ import (
 // @Produce  json
 // @Param input body companyModel.ManagerCountModel true "credentials"
 // @Success 200 {object} companyModel.ManagerAnyCountModel "data"
-// @Failure 400,404 {object} errorResponse
-// @Failure 500 {object} errorResponse
-// @Failure default {object} errorResponse
+// @Failure 400,404 {object} ResponseMessage
+// @Failure 500 {object} ResponseMessage
+// @Failure default {object} ResponseMessage
 // @Router /company/manager/get/all [post]
 func (h *Handler) getManagers(c *gin.Context) {
 	var input companyModel.ManagerCountModel
 
 	if err := c.BindJSON(&input); err != nil {
-		newErrorResponse(c, http.StatusInternalServerError, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	userId, _, domainId, err := getContextUserInfo(c)
+	userId, _, domainId, err := utilContext.GetContextUserInfo(c)
 	if err != nil {
-		newErrorResponse(c, http.StatusForbidden, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusForbidden, err.Error())
 		return
 	}
 
 	data, err := h.services.Company.GetManagers(userId, domainId, input)
 	if err != nil {
-		newErrorResponse(c, http.StatusBadRequest, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -54,21 +55,21 @@ func (h *Handler) getManagers(c *gin.Context) {
 // @Param uuid query string true "uuid"
 // @Param logo query string true "logo"
 // @Success 200 {object} companyModel.CompanyImageModel "data"
-// @Failure 400,404 {object} errorResponse
-// @Failure 500 {object} errorResponse
-// @Failure default {object} errorResponse
+// @Failure 400,404 {object} ResponseMessage
+// @Failure 500 {object} ResponseMessage
+// @Failure default {object} ResponseMessage
 // @Router /company/update [post]
 func (h *Handler) companyUpdateImage(c *gin.Context) {
 	form, err := c.MultipartForm()
 
 	if err != nil {
-		newErrorResponse(c, http.StatusInternalServerError, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	userId, _, domainId, err := getContextUserInfo(c)
+	userId, _, domainId, err := utilContext.GetContextUserInfo(c)
 	if err != nil {
-		newErrorResponse(c, http.StatusForbidden, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusForbidden, err.Error())
 		return
 	}
 
@@ -76,7 +77,7 @@ func (h *Handler) companyUpdateImage(c *gin.Context) {
 	uuidCompany := c.PostForm("uuid")
 
 	if (len(file) <= 0) || (uuidCompany == "") {
-		newErrorResponse(c, http.StatusBadRequest, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -100,7 +101,7 @@ func (h *Handler) companyUpdateImage(c *gin.Context) {
 
 	if err != nil {
 		form.RemoveAll()
-		newErrorResponse(c, http.StatusInternalServerError, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -115,21 +116,21 @@ func (h *Handler) companyUpdateImage(c *gin.Context) {
 // @Accept  json
 // @Produce  json
 // @Success 200 {object} companyModel.CompanyUpdateModel "data"
-// @Failure 400,404 {object} errorResponse
-// @Failure 500 {object} errorResponse
-// @Failure default {object} errorResponse
+// @Failure 400,404 {object} ResponseMessage
+// @Failure 500 {object} ResponseMessage
+// @Failure default {object} ResponseMessage
 // @Router /company/update [post]
 func (h *Handler) companyUpdate(c *gin.Context) {
 	var input companyModel.CompanyUpdateModel
 
 	if err := c.BindJSON(&input); err != nil {
-		newErrorResponse(c, http.StatusInternalServerError, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	userId, _, domainId, err := getContextUserInfo(c)
+	userId, _, domainId, err := utilContext.GetContextUserInfo(c)
 	if err != nil {
-		newErrorResponse(c, http.StatusForbidden, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusForbidden, err.Error())
 		return
 	}
 
@@ -142,7 +143,7 @@ func (h *Handler) companyUpdate(c *gin.Context) {
 	)
 
 	if err != nil {
-		newErrorResponse(c, http.StatusForbidden, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusForbidden, err.Error())
 		return
 	}
 
@@ -158,21 +159,21 @@ func (h *Handler) companyUpdate(c *gin.Context) {
 // @Param Authorization header string true "Токен доступа для текущего пользователя" example(Bearer access_token)
 // @Param input body companyModel.ManagerUuidModel true "credentials"
 // @Success 200 {object} companyModel.ManagerCompanyModel "data"
-// @Failure 400,404 {object} errorResponse
-// @Failure 500 {object} errorResponse
-// @Failure default {object} errorResponse
+// @Failure 400,404 {object} ResponseMessage
+// @Failure 500 {object} ResponseMessage
+// @Failure default {object} ResponseMessage
 // @Router /company/manager/get [post]
 func (h *Handler) companyGetManager(c *gin.Context) {
 	var input companyModel.ManagerUuidModel
 
 	if err := c.BindJSON(&input); err != nil {
-		newErrorResponse(c, http.StatusInternalServerError, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	userId, _, domainId, err := getContextUserInfo(c)
+	userId, _, domainId, err := utilContext.GetContextUserInfo(c)
 	if err != nil {
-		newErrorResponse(c, http.StatusForbidden, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusForbidden, err.Error())
 		return
 	}
 
@@ -185,7 +186,7 @@ func (h *Handler) companyGetManager(c *gin.Context) {
 	)
 
 	if err != nil {
-		newErrorResponse(c, http.StatusForbidden, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusForbidden, err.Error())
 		return
 	}
 

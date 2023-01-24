@@ -3,9 +3,12 @@ package service
 import (
 	adminModel "main-server/pkg/model/admin"
 	companyModel "main-server/pkg/model/company"
+	emailModel "main-server/pkg/model/email"
+	excelModel "main-server/pkg/model/excel"
 	projectModel "main-server/pkg/model/project"
 	rbacModel "main-server/pkg/model/rbac"
 	userModel "main-server/pkg/model/user"
+	infoModel "main-server/pkg/module/excel_analysis/model"
 	repository "main-server/pkg/repository"
 
 	"github.com/gin-gonic/gin"
@@ -70,6 +73,14 @@ type Company interface {
 	CompanyUpdate(user userModel.UserIdentityModel, data companyModel.CompanyUpdateModel) (companyModel.CompanyUpdateModel, error)
 }
 
+type ServiceMain interface {
+	SendEmail(user *userModel.UserIdentityModel, body *emailModel.MessageInputModel) (bool, error)
+}
+
+type ExcelAnalysis interface {
+	GetHeaderInfoDocument(document excelModel.DocumentIdModel) (infoModel.HeaderInfoModel, error)
+}
+
 type Service struct {
 	Authorization
 	Token
@@ -79,6 +90,8 @@ type Service struct {
 	Role
 	Project
 	Company
+	ServiceMain
+	ExcelAnalysis
 }
 
 func NewService(repos *repository.Repository) *Service {
@@ -93,5 +106,7 @@ func NewService(repos *repository.Repository) *Service {
 		Role:          NewRoleService(repos.Role),
 		Project:       NewProjectService(repos.Project),
 		Company:       NewCompanyService(repos.Company),
+		ServiceMain:   NewServiceMainService(repos.ServiceMain),
+		ExcelAnalysis: NewExcelAnalysisService(repos.ExcelAnalysis),
 	}
 }

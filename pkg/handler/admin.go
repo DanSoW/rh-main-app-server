@@ -2,6 +2,7 @@ package handler
 
 import (
 	pathConstant "main-server/pkg/constant/path"
+	utilContext "main-server/pkg/handler/util"
 	adminModel "main-server/pkg/model/admin"
 	"net/http"
 
@@ -17,9 +18,9 @@ import (
 // @Produce  json
 // @Param Authorization header string true "Токен доступа для текущего пользователя" example(Bearer access_token)
 // @Success 200 {object} adminModel.UsersResponseModel "data"
-// @Failure 400,404 {object} errorResponse
-// @Failure 500 {object} errorResponse
-// @Failure default {object} errorResponse
+// @Failure 400,404 {object} ResponseMessage
+// @Failure 500 {object} ResponseMessage
+// @Failure default {object} ResponseMessage
 // @Router /admin/user/get/all [post]
 func (h *Handler) getAllUsers(c *gin.Context) {
 	var data adminModel.UsersResponseModel
@@ -27,7 +28,7 @@ func (h *Handler) getAllUsers(c *gin.Context) {
 	data, err := h.services.Admin.GetAllUsers(c)
 
 	if err != nil {
-		newErrorResponse(c, http.StatusInternalServerError, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -49,15 +50,15 @@ func (h *Handler) getAllUsers(c *gin.Context) {
 // @Param phone formData string true "Номер телефона компании"
 // @Param link formData string true "Ссылка на сайт компании"
 // @Success 200 {object} adminModel.CompanyModel "data"
-// @Failure 400,404 {object} errorResponse
-// @Failure 500 {object} errorResponse
-// @Failure default {object} errorResponse
+// @Failure 400,404 {object} ResponseMessage
+// @Failure 500 {object} ResponseMessage
+// @Failure default {object} ResponseMessage
 // @Router /admin/company/create [post]
 func (h *Handler) createCompany(c *gin.Context) {
 	form, err := c.MultipartForm()
 
 	if err != nil {
-		newErrorResponse(c, http.StatusInternalServerError, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -88,7 +89,7 @@ func (h *Handler) createCompany(c *gin.Context) {
 
 	if err != nil {
 		form.RemoveAll()
-		newErrorResponse(c, http.StatusInternalServerError, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 

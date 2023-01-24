@@ -16,6 +16,7 @@ import (
 /* Тип предиката для сравнения каждой ячейки таблицы с определённым значением */
 type PredicatType func(value string, row, column int) bool
 
+/* Интерфейс для ядра анализа Excel-таблиц */
 type IExAnalysisKernel interface {
 	CopyTo(filePath string) (bool, error)
 	GetSheet() (*spreadsheet.Sheet, error)
@@ -27,6 +28,7 @@ type IExAnalysisKernel interface {
 	GetValueCells(data *model.HeaderInfoModel, sheet *spreadsheet.Sheet, index model.IndexCellModel, place string) model.IndexCellModel
 }
 
+/* Структура основного ядра анализа Excel-таблиц */
 type ExAnalysisKernel struct {
 	ClientSecretPath string
 	DocumentId       string
@@ -239,7 +241,6 @@ func (k *ExAnalysisKernel) GetValueCells(data *model.HeaderInfoModel, sheet *spr
 	}
 
 	for i := 0; i < indexLen; i++ {
-		nextIndex_RC.Row += i
 		next, _ := k.GetIndexNextRow(nextIndex_RC, sheet, func(value string, row, column int) bool {
 			if len(value) <= 0 {
 				return false
@@ -257,6 +258,8 @@ func (k *ExAnalysisKernel) GetValueCells(data *model.HeaderInfoModel, sheet *spr
 		} else if reflectValue.Kind() == reflect.Slice {
 			reflectValue.Set(reflect.Append(reflectValue, reflect.ValueOf(next.Value)))
 		}
+
+		nextIndex_RC.Row += 1
 	}
 
 	return nextIndex

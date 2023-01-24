@@ -1,8 +1,8 @@
 package handler
 
 import (
-	"errors"
 	middlewareConstants "main-server/pkg/constant/middleware"
+	utilContext "main-server/pkg/handler/util"
 	authService "main-server/pkg/service/auth"
 	"net/http"
 	"strings"
@@ -16,34 +16,34 @@ func (h *Handler) userIdentity(c *gin.Context) {
 	header := c.GetHeader(middlewareConstants.AUTHORIZATION_HEADER)
 
 	if header == "" {
-		newErrorResponse(c, http.StatusUnauthorized, "Пустой заголовок авторизации!")
+		utilContext.NewErrorResponse(c, http.StatusUnauthorized, "Пустой заголовок авторизации!")
 		return
 	}
 
 	headerParts := strings.Split(header, " ")
 	if (len(headerParts) != 2) || (headerParts[1] == "null") || (headerParts[1] == "undefined") {
-		newErrorResponse(c, http.StatusUnauthorized, "Пользователь не авторизован!")
+		utilContext.NewErrorResponse(c, http.StatusUnauthorized, "Пользователь не авторизован!")
 		return
 	}
 
 	data, err := h.services.Token.ParseToken(headerParts[1], viper.GetString("token.signing_key_access"))
 
 	if err != nil {
-		newErrorResponse(c, http.StatusUnauthorized, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusUnauthorized, err.Error())
 		return
 	}
 
 	domain, err := h.services.Domain.GetDomain("value", viper.GetString("domain"))
 
 	if err != nil {
-		newErrorResponse(c, http.StatusUnauthorized, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusUnauthorized, err.Error())
 		return
 	}
 
 	switch data.AuthType.Value {
 	case "GOOGLE":
 		if result, err := authService.VerifyAccessToken(*data.TokenApi); err != nil || result != true {
-			newErrorResponse(c, http.StatusUnauthorized, "Не действительный токен доступа")
+			utilContext.NewErrorResponse(c, http.StatusUnauthorized, "Не действительный токен доступа")
 			return
 		}
 		break
@@ -65,20 +65,20 @@ func (h *Handler) userIdentityLogout(c *gin.Context) {
 	header := c.GetHeader(middlewareConstants.AUTHORIZATION_HEADER)
 
 	if header == "" {
-		newErrorResponse(c, http.StatusUnauthorized, "Пустой заголовок авторизации!")
+		utilContext.NewErrorResponse(c, http.StatusUnauthorized, "Пустой заголовок авторизации!")
 		return
 	}
 
 	headerParts := strings.Split(header, " ")
 	if len(headerParts) != 2 {
-		newErrorResponse(c, http.StatusUnauthorized, "Не корректный авторизационный заголовок!")
+		utilContext.NewErrorResponse(c, http.StatusUnauthorized, "Не корректный авторизационный заголовок!")
 		return
 	}
 
 	data, err := h.services.Token.ParseTokenWithoutValid(headerParts[1], viper.GetString("token.signing_key_access"))
 
 	if err != nil {
-		newErrorResponse(c, http.StatusUnauthorized, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusUnauthorized, err.Error())
 		return
 	}
 
@@ -90,48 +90,11 @@ func (h *Handler) userIdentityLogout(c *gin.Context) {
 	c.Set(middlewareConstants.ACCESS_TOKEN_CTX, headerParts[1])
 }
 
-func getUserId(c *gin.Context) (int, error) {
-	id, ok := c.Get(middlewareConstants.USER_CTX)
-	if !ok {
-		return 0, errors.New("user id not found")
-	}
-
-	idInt, ok := id.(int)
-	if !ok {
-		return 0, errors.New("user id is of invalid type")
-	}
-
-	return idInt, nil
-}
-
-/* Function for get information user with gin.Context */
-func getContextUserInfo(c *gin.Context) (int, string, int, error) {
-	usersId, exist := c.Get(middlewareConstants.USER_CTX)
-
-	if !exist {
-		return -1, "", -1, errors.New("Нет доступа!")
-	}
-
-	usersUuid, exist := c.Get(middlewareConstants.USER_UUID_CTX)
-
-	if !exist {
-		return -1, "", -1, errors.New("Нет доступа!")
-	}
-
-	domainsId, exist := c.Get(middlewareConstants.DOMAINS_ID)
-
-	if !exist {
-		return -1, "", -1, errors.New("Нет доступа!")
-	}
-
-	return usersId.(int), usersUuid.(string), domainsId.(int), nil
-}
-
 func (h *Handler) userIdentityHasRoles(exp string, roles ...string) func(c *gin.Context) {
 	return func(c *gin.Context) {
-		usersId, _, domainsId, err := getContextUserInfo(c)
+		usersId, _, domainsId, err := utilContext.GetContextUserInfo(c)
 		if err != nil {
-			newErrorResponse(c, http.StatusForbidden, "Нет доступа!")
+			utilContext.NewErrorResponse(c, http.StatusForbidden, "Нет доступа!")
 			return
 		}
 
@@ -141,7 +104,7 @@ func (h *Handler) userIdentityHasRoles(exp string, roles ...string) func(c *gin.
 			has, err := h.services.Role.HasRole(usersId, domainsId, element)
 
 			if err != nil {
-				newErrorResponse(c, http.StatusForbidden, "Нет доступа!")
+				utilContext.NewErrorResponse(c, http.StatusForbidden, "Нет доступа!")
 				return
 			}
 
@@ -169,7 +132,7 @@ func (h *Handler) userIdentityHasRoles(exp string, roles ...string) func(c *gin.
 		}
 
 		if !access {
-			newErrorResponse(c, http.StatusForbidden, "Нет доступа!")
+			utilContext.NewErrorResponse(c, http.StatusForbidden, "Нет доступа!")
 			return
 		}
 	}
@@ -177,16 +140,16 @@ func (h *Handler) userIdentityHasRoles(exp string, roles ...string) func(c *gin.
 
 func (h *Handler) userIdentityHasRole(role string) func(c *gin.Context) {
 	return func(c *gin.Context) {
-		usersId, _, domainsId, err := getContextUserInfo(c)
+		usersId, _, domainsId, err := utilContext.GetContextUserInfo(c)
 		if err != nil {
-			newErrorResponse(c, http.StatusForbidden, "Нет доступа!")
+			utilContext.NewErrorResponse(c, http.StatusForbidden, "Нет доступа!")
 			return
 		}
 
 		has, err := h.services.Role.HasRole(usersId, domainsId, role)
 
 		if (err != nil) || (!has) {
-			newErrorResponse(c, http.StatusForbidden, "Нет доступа!")
+			utilContext.NewErrorResponse(c, http.StatusForbidden, "Нет доступа!")
 			return
 		}
 	}

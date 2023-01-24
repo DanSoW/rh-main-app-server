@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	pathConstant "main-server/pkg/constant/path"
+	utilContext "main-server/pkg/handler/util"
 	projectModel "main-server/pkg/model/project"
 	userModel "main-server/pkg/model/user"
 	"net/http"
@@ -19,27 +20,27 @@ import (
 // @Produce  json
 // @Param input body projectModel.ProjectModel true "credentials"
 // @Success 200 {object} projectModel.ProjectModel "data"
-// @Failure 400,404 {object} errorResponse
-// @Failure 500 {object} errorResponse
-// @Failure default {object} errorResponse
+// @Failure 400,404 {object} ResponseMessage
+// @Failure 500 {object} ResponseMessage
+// @Failure default {object} ResponseMessage
 // @Router /company/project/create [post]
 func (h *Handler) createProject(c *gin.Context) {
 	var input projectModel.ProjectModel
 
 	if err := c.BindJSON(&input); err != nil {
-		newErrorResponse(c, http.StatusInternalServerError, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	userId, _, domainId, err := getContextUserInfo(c)
+	userId, _, domainId, err := utilContext.GetContextUserInfo(c)
 	if err != nil {
-		newErrorResponse(c, http.StatusForbidden, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusForbidden, err.Error())
 		return
 	}
 
 	data, err := h.services.Project.CreateProject(userId, domainId, input)
 	if err != nil {
-		newErrorResponse(c, http.StatusBadRequest, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -54,27 +55,27 @@ func (h *Handler) createProject(c *gin.Context) {
 // @Produce  json
 // @Param input body projectModel.ProjectUuidModel true "credentials"
 // @Success 200 {object} projectModel.ProjectDbDataEx "data"
-// @Failure 400,404 {object} errorResponse
-// @Failure 500 {object} errorResponse
-// @Failure default {object} errorResponse
+// @Failure 400,404 {object} ResponseMessage
+// @Failure 500 {object} ResponseMessage
+// @Failure default {object} ResponseMessage
 // @Router /company/project/get [post]
 func (h *Handler) getProject(c *gin.Context) {
 	var input projectModel.ProjectUuidModel
 
 	if err := c.BindJSON(&input); err != nil {
-		newErrorResponse(c, http.StatusInternalServerError, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	userId, _, domainId, err := getContextUserInfo(c)
+	userId, _, domainId, err := utilContext.GetContextUserInfo(c)
 	if err != nil {
-		newErrorResponse(c, http.StatusForbidden, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusForbidden, err.Error())
 		return
 	}
 
 	data, err := h.services.Project.GetProject(userId, domainId, input)
 	if err != nil {
-		newErrorResponse(c, http.StatusBadRequest, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -82,7 +83,7 @@ func (h *Handler) getProject(c *gin.Context) {
 	var projectData projectModel.ProjectDataModel
 	err = json.Unmarshal([]byte(data.Data), &projectData)
 	if err != nil {
-		newErrorResponse(c, http.StatusInternalServerError, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -101,27 +102,27 @@ func (h *Handler) getProject(c *gin.Context) {
 // @Produce  json
 // @Param input body projectModel.ProjectCountModel true "credentials"
 // @Success 200 {object} projectModel.ProjectAnyCountModel "data"
-// @Failure 400,404 {object} errorResponse
-// @Failure 500 {object} errorResponse
-// @Failure default {object} errorResponse
+// @Failure 400,404 {object} ResponseMessage
+// @Failure 500 {object} ResponseMessage
+// @Failure default {object} ResponseMessage
 // @Router /company/project/get/all [post]
 func (h *Handler) getProjects(c *gin.Context) {
 	var input projectModel.ProjectCountModel
 
 	if err := c.BindJSON(&input); err != nil {
-		newErrorResponse(c, http.StatusInternalServerError, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	userId, _, domainId, err := getContextUserInfo(c)
+	userId, _, domainId, err := utilContext.GetContextUserInfo(c)
 	if err != nil {
-		newErrorResponse(c, http.StatusForbidden, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusForbidden, err.Error())
 		return
 	}
 
 	data, err := h.services.Project.GetProjects(userId, domainId, input)
 	if err != nil {
-		newErrorResponse(c, http.StatusBadRequest, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -137,14 +138,14 @@ func (h *Handler) getProjects(c *gin.Context) {
 // @Param logo query string true "logo"
 // @Param uuid query string true "uuid"
 // @Success 200 {object} projectModel.ProjectImageModel "data"
-// @Failure 400,404 {object} errorResponse
-// @Failure 500 {object} errorResponse
-// @Failure default {object} errorResponse
+// @Failure 400,404 {object} ResponseMessage
+// @Failure 500 {object} ResponseMessage
+// @Failure default {object} ResponseMessage
 // @Router /company/project/update/image [post]
 func (h *Handler) projectUpdateImage(c *gin.Context) {
 	form, err := c.MultipartForm()
 	if err != nil {
-		newErrorResponse(c, http.StatusInternalServerError, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -155,9 +156,9 @@ func (h *Handler) projectUpdateImage(c *gin.Context) {
 	newFilename := uuid.NewV4().String()
 	filepath := pathConstant.PUBLIC_PROJECT + newFilename
 
-	userId, _, domainId, err := getContextUserInfo(c)
+	userId, _, domainId, err := utilContext.GetContextUserInfo(c)
 	if err != nil {
-		newErrorResponse(c, http.StatusForbidden, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusForbidden, err.Error())
 		return
 	}
 
@@ -172,7 +173,7 @@ func (h *Handler) projectUpdateImage(c *gin.Context) {
 
 	if err != nil {
 		form.RemoveAll()
-		newErrorResponse(c, http.StatusForbidden, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusForbidden, err.Error())
 		return
 	}
 
@@ -187,21 +188,21 @@ func (h *Handler) projectUpdateImage(c *gin.Context) {
 // @Accept  json
 // @Produce  json
 // @Success 200 {object} projectModel.ProjectUpdateModel "data"
-// @Failure 400,404 {object} errorResponse
-// @Failure 500 {object} errorResponse
-// @Failure default {object} errorResponse
+// @Failure 400,404 {object} ResponseMessage
+// @Failure 500 {object} ResponseMessage
+// @Failure default {object} ResponseMessage
 // @Router /company/project/update [post]
 func (h *Handler) projectUpdate(c *gin.Context) {
 	var input projectModel.ProjectUpdateModel
 
 	if err := c.BindJSON(&input); err != nil {
-		newErrorResponse(c, http.StatusInternalServerError, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	userId, _, domainId, err := getContextUserInfo(c)
+	userId, _, domainId, err := utilContext.GetContextUserInfo(c)
 	if err != nil {
-		newErrorResponse(c, http.StatusForbidden, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusForbidden, err.Error())
 		return
 	}
 
@@ -214,7 +215,7 @@ func (h *Handler) projectUpdate(c *gin.Context) {
 	)
 
 	if err != nil {
-		newErrorResponse(c, http.StatusForbidden, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusForbidden, err.Error())
 		return
 	}
 

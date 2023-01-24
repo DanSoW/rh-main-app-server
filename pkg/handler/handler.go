@@ -2,7 +2,9 @@ package handler
 
 import (
 	"fmt"
+	middlewareConstant "main-server/pkg/constant/middleware"
 	roleConstant "main-server/pkg/constant/role"
+	serviceHandler "main-server/pkg/handler/service"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -52,6 +54,21 @@ func (h *Handler) InitRoutes() *gin.Engine {
 	// URL: /swagger/index.html
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
+	// Инициализация списка обработчиков в цепочке middleware
+	middleware := make(map[string]func(c *gin.Context))
+	middleware[middlewareConstant.MN_USER_IDENTITY] = h.userIdentity
+
+	// Инициализация маршрутов для сервиса
+	service := serviceHandler.NewServiceHandler(router, h.services)
+	service.InitRoutes(&middleware)
+
+	// URL: /excel
+	excel := router.Group(route.EXCEL_MAIN)
+	{
+		// URL: /excel/analysis
+		excel.POST(route.EXCEL_ANALYSIS, h.excelAnalysis)
+	}
+
 	// URL: /auth
 	auth := router.Group(route.AUTH_MAIN_ROUTE)
 	{
@@ -81,17 +98,6 @@ func (h *Handler) InitRoutes() *gin.Engine {
 
 		// URL: /auth/reset/password
 		auth.POST(route.AUTH_RESET_PASSWORD, h.resetPassword)
-	}
-
-	// URL: /service
-	service := router.Group(route.SERVICE, h.userIdentity)
-	{
-		// URL: /main
-		main := service.Group(route.SERVICE_MAIN)
-		{
-			// URL: /verify
-			main.POST(route.SERVICE_VERIFY, h.serviceMainVerify)
-		}
 	}
 
 	// URL: /user

@@ -4,6 +4,8 @@ import (
 	config "main-server/config"
 	middlewareConstant "main-server/pkg/constant/middleware"
 	pathConstant "main-server/pkg/constant/path"
+	utilContext "main-server/pkg/handler/util"
+	httpModel "main-server/pkg/model/http"
 	userModel "main-server/pkg/model/user"
 	"net/http"
 
@@ -20,21 +22,21 @@ import (
 // @Produce  json
 // @Param input body userModel.UserRegisterModel true "account info"
 // @Success 200 {object} userModel.TokenAccessModel "data"
-// @Failure 400,404 {object} errorResponse
-// @Failure 500 {object} errorResponse
-// @Failure default {object} errorResponse
+// @Failure 400,404 {object} ResponseMessage
+// @Failure 500 {object} ResponseMessage
+// @Failure default {object} ResponseMessage
 // @Router /auth/sign-up [post]
 func (h *Handler) signUp(c *gin.Context) {
 	var input userModel.UserRegisterModel
 
 	if err := c.BindJSON(&input); err != nil {
-		newErrorResponse(c, http.StatusBadRequest, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	data, err := h.services.Authorization.CreateUser(input)
 	if err != nil {
-		newErrorResponse(c, http.StatusInternalServerError, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -56,14 +58,14 @@ func (h *Handler) signUp(c *gin.Context) {
 // @Produce  json
 // @Param input body userModel.UserRegisterModel true "account info"
 // @Success 200 {object} userModel.TokenAccessModel "data"
-// @Failure 400,404 {object} errorResponse
-// @Failure 500 {object} errorResponse
-// @Failure default {object} errorResponse
+// @Failure 400,404 {object} ResponseMessage
+// @Failure 500 {object} ResponseMessage
+// @Failure default {object} ResponseMessage
 // @Router /auth/sign-up/upload/image [post]
 func (h *Handler) uploadProfileImage(c *gin.Context) {
 	form, err := c.MultipartForm()
 	if err != nil {
-		newErrorResponse(c, http.StatusBadRequest, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -79,11 +81,11 @@ func (h *Handler) uploadProfileImage(c *gin.Context) {
 	_, err = h.services.Authorization.UploadProfileImage(c, filepath)
 
 	if err != nil {
-		newErrorResponse(c, http.StatusInternalServerError, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, statusResponse{
+	c.JSON(http.StatusOK, httpModel.ResponseStatus{
 		Status: "Изображение профиля пользователя было обновлено",
 	})
 }
@@ -96,21 +98,21 @@ func (h *Handler) uploadProfileImage(c *gin.Context) {
 // @Produce  json
 // @Param input body userModel.UserLoginModel true "credentials"
 // @Success 200 {object} userModel.TokenAccessModel "data"
-// @Failure 400,404 {object} errorResponse
-// @Failure 500 {object} errorResponse
-// @Failure default {object} errorResponse
+// @Failure 400,404 {object} ResponseMessage
+// @Failure 500 {object} ResponseMessage
+// @Failure default {object} ResponseMessage
 // @Router /auth/sign-in [post]
 func (h *Handler) signIn(c *gin.Context) {
 	var input userModel.UserLoginModel
 
 	if err := c.BindJSON(&input); err != nil {
-		newErrorResponse(c, http.StatusBadRequest, "invalid input body")
+		utilContext.NewErrorResponse(c, http.StatusBadRequest, "invalid input body")
 		return
 	}
 
 	data, err := h.services.Authorization.LoginUser(input)
 	if err != nil {
-		newErrorResponse(c, http.StatusBadRequest, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -132,21 +134,21 @@ func (h *Handler) signIn(c *gin.Context) {
 // @Produce  json
 // @Param input body userModel.UserLoginModel true "credentials"
 // @Success 200 {object} userModel.TokenAccessModel "data"
-// @Failure 400,404 {object} errorResponse
-// @Failure 500 {object} errorResponse
-// @Failure default {object} errorResponse
+// @Failure 400,404 {object} ResponseMessage
+// @Failure 500 {object} ResponseMessage
+// @Failure default {object} ResponseMessage
 // @Router /auth/sign-in/vk [post]
 func (h *Handler) signInVK(c *gin.Context) {
 	var input userModel.UserLoginModel
 
 	if err := c.BindJSON(&input); err != nil {
-		newErrorResponse(c, http.StatusBadRequest, "invalid input body")
+		utilContext.NewErrorResponse(c, http.StatusBadRequest, "invalid input body")
 		return
 	}
 
 	data, err := h.services.Authorization.LoginUser(input)
 	if err != nil {
-		newErrorResponse(c, http.StatusBadRequest, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -168,15 +170,15 @@ func (h *Handler) signInVK(c *gin.Context) {
 // @Produce  json
 // @Param input body userModel.GoogleOAuth2Code true "credentials"
 // @Success 200 {object} userModel.TokenAccessModel "data"
-// @Failure 400,404 {object} errorResponse
-// @Failure 500 {object} errorResponse
-// @Failure default {object} errorResponse
+// @Failure 400,404 {object} ResponseMessage
+// @Failure 500 {object} ResponseMessage
+// @Failure default {object} ResponseMessage
 // @Router /auth/sign-in/oauth2 [post]
 func (h *Handler) signInOAuth2(c *gin.Context) {
 	var input userModel.GoogleOAuth2Code
 
 	if err := c.BindJSON(&input); err != nil {
-		newErrorResponse(c, http.StatusBadRequest, "invalid input body")
+		utilContext.NewErrorResponse(c, http.StatusBadRequest, "invalid input body")
 		return
 	}
 
@@ -187,7 +189,7 @@ func (h *Handler) signInOAuth2(c *gin.Context) {
 
 	data, err := h.services.Authorization.LoginUserOAuth2(input.Code)
 	if err != nil {
-		newErrorResponse(c, http.StatusBadRequest, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -209,9 +211,9 @@ func (h *Handler) signInOAuth2(c *gin.Context) {
 // @Produce  json
 // @Param Authorization header string true "Токен доступа для текущего пользователя" example(Bearer access_token)
 // @Success 200 {object} userModel.TokenAccessModel "data"
-// @Failure 400,404 {object} errorResponse
-// @Failure 500 {object} errorResponse
-// @Failure default {object} errorResponse
+// @Failure 400,404 {object} ResponseMessage
+// @Failure 500 {object} ResponseMessage
+// @Failure default {object} ResponseMessage
 // @Router /auth/refresh [post]
 func (h *Handler) refresh(c *gin.Context) {
 
@@ -219,7 +221,7 @@ func (h *Handler) refresh(c *gin.Context) {
 	refreshToken, err := c.Cookie(viper.GetString("environment.refresh_token_key"))
 
 	if err != nil {
-		newErrorResponse(c, http.StatusUnauthorized, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusUnauthorized, err.Error())
 		return
 	}
 
@@ -237,7 +239,7 @@ func (h *Handler) refresh(c *gin.Context) {
 	}, refreshToken)
 
 	if err != nil {
-		newErrorResponse(c, http.StatusUnauthorized, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusUnauthorized, err.Error())
 		return
 	}
 
@@ -263,15 +265,15 @@ type LogoutOutputModel struct {
 // @Produce  json
 // @Param Authorization header string true "Токен доступа для текущего пользователя" example(Bearer access_token)
 // @Success 200 {object} LogoutOutputModel "data"
-// @Failure 400,404 {object} errorResponse
-// @Failure 500 {object} errorResponse
-// @Failure default {object} errorResponse
+// @Failure 400,404 {object} ResponseMessage
+// @Failure 500 {object} ResponseMessage
+// @Failure default {object} ResponseMessage
 // @Router /auth/logout [post]
 func (h *Handler) logout(c *gin.Context) {
 	refreshToken, err := c.Cookie(viper.GetString("environment.refresh_token_key"))
 
 	if err != nil {
-		newErrorResponse(c, http.StatusBadRequest, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -287,7 +289,7 @@ func (h *Handler) logout(c *gin.Context) {
 	})
 
 	if err != nil {
-		newErrorResponse(c, http.StatusInternalServerError, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -309,15 +311,15 @@ func (h *Handler) logout(c *gin.Context) {
 // @Accept  json
 // @Produce  json
 // @Success 200 {object} LogoutOutputModel "data"
-// @Failure 400,404 {object} errorResponse
-// @Failure 500 {object} errorResponse
-// @Failure default {object} errorResponse
+// @Failure 400,404 {object} ResponseMessage
+// @Failure 500 {object} ResponseMessage
+// @Failure default {object} ResponseMessage
 // @Router /auth/activate [get]
 func (h *Handler) activate(c *gin.Context) {
 	_, err := h.services.Activate(c.Params.ByName("link"))
 
 	if err != nil {
-		newErrorResponse(c, http.StatusBadRequest, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -333,26 +335,26 @@ func (h *Handler) activate(c *gin.Context) {
 // @Accept  json
 // @Produce  json
 // @Param input body userModel.UserEmailModel true "credentials"
-// @Success 200 {object} successResponse "data"
-// @Failure 400,404 {object} errorResponse
-// @Failure 500 {object} errorResponse
-// @Failure default {object} errorResponse
+// @Success 200 {object} ResponseMessage "data"
+// @Failure 400,404 {object} ResponseMessage
+// @Failure 500 {object} ResponseMessage
+// @Failure default {object} ResponseMessage
 // @Router /auth/recovery/password [post]
 func (h *Handler) recoveryPassword(c *gin.Context) {
 	var input userModel.UserEmailModel
 
 	if err := c.BindJSON(&input); err != nil {
-		newErrorResponse(c, http.StatusBadRequest, "invalid input body")
+		utilContext.NewErrorResponse(c, http.StatusBadRequest, "invalid input body")
 		return
 	}
 
 	_, err := h.services.Authorization.RecoveryPassword(input.Email)
 	if err != nil {
-		newErrorResponse(c, http.StatusInternalServerError, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, successResponse{
+	c.JSON(http.StatusOK, httpModel.ResponseMessage{
 		Message: "На Вашу почту была отправлена ссылка с подтверждением изменения пароля",
 	})
 }
@@ -364,26 +366,26 @@ func (h *Handler) recoveryPassword(c *gin.Context) {
 // @Accept  json
 // @Produce  json
 // @Param input body userModel.ResetPasswordModel true "credentials"
-// @Success 200 {object} successResponse "data"
-// @Failure 400,404 {object} errorResponse
-// @Failure 500 {object} errorResponse
-// @Failure default {object} errorResponse
+// @Success 200 {object} ResponseMessage "data"
+// @Failure 400,404 {object} ResponseMessage
+// @Failure 500 {object} ResponseMessage
+// @Failure default {object} ResponseMessage
 // @Router /auth/reset/password [post]
 func (h *Handler) resetPassword(c *gin.Context) {
 	var input userModel.ResetPasswordModel
 
 	if err := c.BindJSON(&input); err != nil {
-		newErrorResponse(c, http.StatusBadRequest, "invalid input body")
+		utilContext.NewErrorResponse(c, http.StatusBadRequest, "invalid input body")
 		return
 	}
 
 	_, err := h.services.Authorization.ResetPassword(input)
 	if err != nil {
-		newErrorResponse(c, http.StatusInternalServerError, err.Error())
+		utilContext.NewErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, successResponse{
+	c.JSON(http.StatusOK, httpModel.ResponseMessage{
 		Message: "Пароль был успешно изменён!",
 	})
 }

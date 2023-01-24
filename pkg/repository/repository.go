@@ -3,9 +3,12 @@ package repository
 import (
 	adminModel "main-server/pkg/model/admin"
 	companyModel "main-server/pkg/model/company"
+	emailModel "main-server/pkg/model/email"
+	excelModel "main-server/pkg/model/excel"
 	projectModel "main-server/pkg/model/project"
 	rbacModel "main-server/pkg/model/rbac"
 	userModel "main-server/pkg/model/user"
+	infoModel "main-server/pkg/module/excel_analysis/model"
 
 	"github.com/casbin/casbin/v2"
 	"github.com/gin-gonic/gin"
@@ -14,7 +17,6 @@ import (
 )
 
 type Authorization interface {
-	// Main routes for user authenticated
 	CreateUser(user userModel.UserRegisterModel) (userModel.UserAuthDataModel, error)
 	UploadProfileImage(c *gin.Context, filepath string) (bool, error)
 	LoginUser(user userModel.UserLoginModel) (userModel.UserAuthDataModel, error)
@@ -23,12 +25,8 @@ type Authorization interface {
 	Refresh(data userModel.TokenLogoutDataModel, refreshToken string, token userModel.TokenOutputParse) (userModel.UserAuthDataModel, error)
 	Logout(tokens userModel.TokenLogoutDataModel) (bool, error)
 	Activate(link string) (bool, error)
-
-	// Get user information
 	GetUser(column, value string) (userModel.UserModel, error)
 	GetRole(column, value string) (rbacModel.RoleModel, error)
-
-	// Recovery password
 	RecoveryPassword(email string) (bool, error)
 	ResetPassword(data userModel.ResetPasswordModel, token userModel.ResetTokenOutputParse) (bool, error)
 }
@@ -61,11 +59,9 @@ type AuthType interface {
 }
 
 type Project interface {
-	/* CRUD */
 	CreateProject(userId, domainId int, data projectModel.ProjectModel) (projectModel.ProjectModel, error)
 	ProjectUpdate(user userModel.UserIdentityModel, data projectModel.ProjectUpdateModel) (projectModel.ProjectUpdateModel, error)
 	ProjectUpdateImage(userId, domainId int, data projectModel.ProjectImageModel) (projectModel.ProjectImageModel, error)
-
 	GetProject(userId, domainId int, data projectModel.ProjectUuidModel) (projectModel.ProjectDbModel, error)
 	GetProjects(userId, domainId int, data projectModel.ProjectCountModel) (projectModel.ProjectAnyCountModel, error)
 }
@@ -73,15 +69,20 @@ type Project interface {
 type Company interface {
 	GetManagers(userId, domainId int, data companyModel.ManagerCountModel) (companyModel.ManagerAnyCountModel, error)
 	GetManager(user userModel.UserIdentityModel, data companyModel.ManagerUuidModel) (companyModel.ManagerCompanyModel, error)
-
-	/* CRUD */
 	CompanyUpdateImage(user userModel.UserIdentityModel, data companyModel.CompanyImageModel) (companyModel.CompanyImageModel, error)
 	CompanyUpdate(user userModel.UserIdentityModel, data companyModel.CompanyUpdateModel) (companyModel.CompanyUpdateModel, error)
 }
 
-/* Обёртка над функционалом sqlx */
 type Wrapper interface {
 	GetOne(table string, column, value interface{}) (interface{}, error)
+}
+
+type ServiceMain interface {
+	SendEmail(*userModel.UserIdentityModel, *emailModel.MessageInputModel) (bool, error)
+}
+
+type ExcelAnalysis interface {
+	GetHeaderInfoDocument(document excelModel.DocumentIdModel) (infoModel.HeaderInfoModel, error)
 }
 
 type Repository struct {
@@ -94,6 +95,8 @@ type Repository struct {
 	Project
 	Company
 	Wrapper
+	ServiceMain
+	ExcelAnalysis
 }
 
 func NewRepository(db *sqlx.DB, enforcer *casbin.Enforcer) *Repository {
@@ -105,6 +108,7 @@ func NewRepository(db *sqlx.DB, enforcer *casbin.Enforcer) *Repository {
 	admin := NewAdminPostgres(db, enforcer, domain, role)
 	project := NewProjectPostgres(db, enforcer, role)
 	company := NewCompanyPostgres(db, enforcer, role, user, wrapper)
+	serviceMain := NewServiceMainRepository(db, enforcer, user)
 
 	return &Repository{
 		Authorization: NewAuthPostgres(db, enforcer, *user),
@@ -116,5 +120,7 @@ func NewRepository(db *sqlx.DB, enforcer *casbin.Enforcer) *Repository {
 		Project:       project,
 		Company:       company,
 		Wrapper:       wrapper,
+		ServiceMain:   serviceMain,
+		ExcelAnalysis: NewExcelAnalysis(),
 	}
 }
