@@ -1,4 +1,4 @@
-package handler
+package excel
 
 import (
 	utilContext "main-server/pkg/handler/util"
@@ -21,7 +21,7 @@ import (
 // @Failure 500 {object} ResponseMessage
 // @Failure default {object} ResponseMessage
 // @Router /excel/analysis [post]
-func (h *Handler) excelAnalysis(c *gin.Context) {
+func (h *ExcelHandler) excelAnalysis(c *gin.Context) {
 	var input excelModel.DocumentIdModel
 
 	if err := c.BindJSON(&input); err != nil {

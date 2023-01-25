@@ -1,4 +1,4 @@
-package handler
+package company
 
 import (
 	pathConstant "main-server/pkg/constant/path"
@@ -23,7 +23,7 @@ import (
 // @Failure 500 {object} ResponseMessage
 // @Failure default {object} ResponseMessage
 // @Router /company/manager/get/all [post]
-func (h *Handler) getManagers(c *gin.Context) {
+func (h *CompanyHandler) getManagers(c *gin.Context) {
 	var input companyModel.ManagerCountModel
 
 	if err := c.BindJSON(&input); err != nil {
@@ -59,7 +59,7 @@ func (h *Handler) getManagers(c *gin.Context) {
 // @Failure 500 {object} ResponseMessage
 // @Failure default {object} ResponseMessage
 // @Router /company/update [post]
-func (h *Handler) companyUpdateImage(c *gin.Context) {
+func (h *CompanyHandler) companyUpdateImage(c *gin.Context) {
 	form, err := c.MultipartForm()
 
 	if err != nil {
@@ -120,7 +120,7 @@ func (h *Handler) companyUpdateImage(c *gin.Context) {
 // @Failure 500 {object} ResponseMessage
 // @Failure default {object} ResponseMessage
 // @Router /company/update [post]
-func (h *Handler) companyUpdate(c *gin.Context) {
+func (h *CompanyHandler) companyUpdate(c *gin.Context) {
 	var input companyModel.CompanyUpdateModel
 
 	if err := c.BindJSON(&input); err != nil {
@@ -163,7 +163,7 @@ func (h *Handler) companyUpdate(c *gin.Context) {
 // @Failure 500 {object} ResponseMessage
 // @Failure default {object} ResponseMessage
 // @Router /company/manager/get [post]
-func (h *Handler) companyGetManager(c *gin.Context) {
+func (h *CompanyHandler) companyGetManager(c *gin.Context) {
 	var input companyModel.ManagerUuidModel
 
 	if err := c.BindJSON(&input); err != nil {

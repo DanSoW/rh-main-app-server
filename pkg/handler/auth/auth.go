@@ -1,4 +1,4 @@
-package handler
+package auth
 
 import (
 	config "main-server/config"
@@ -26,7 +26,7 @@ import (
 // @Failure 500 {object} ResponseMessage
 // @Failure default {object} ResponseMessage
 // @Router /auth/sign-up [post]
-func (h *Handler) signUp(c *gin.Context) {
+func (h *AuthHandler) signUp(c *gin.Context) {
 	var input userModel.UserRegisterModel
 
 	if err := c.BindJSON(&input); err != nil {
@@ -62,7 +62,7 @@ func (h *Handler) signUp(c *gin.Context) {
 // @Failure 500 {object} ResponseMessage
 // @Failure default {object} ResponseMessage
 // @Router /auth/sign-up/upload/image [post]
-func (h *Handler) uploadProfileImage(c *gin.Context) {
+func (h *AuthHandler) uploadProfileImage(c *gin.Context) {
 	form, err := c.MultipartForm()
 	if err != nil {
 		utilContext.NewErrorResponse(c, http.StatusBadRequest, err.Error())
@@ -102,7 +102,7 @@ func (h *Handler) uploadProfileImage(c *gin.Context) {
 // @Failure 500 {object} ResponseMessage
 // @Failure default {object} ResponseMessage
 // @Router /auth/sign-in [post]
-func (h *Handler) signIn(c *gin.Context) {
+func (h *AuthHandler) signIn(c *gin.Context) {
 	var input userModel.UserLoginModel
 
 	if err := c.BindJSON(&input); err != nil {
@@ -138,7 +138,7 @@ func (h *Handler) signIn(c *gin.Context) {
 // @Failure 500 {object} ResponseMessage
 // @Failure default {object} ResponseMessage
 // @Router /auth/sign-in/vk [post]
-func (h *Handler) signInVK(c *gin.Context) {
+func (h *AuthHandler) signInVK(c *gin.Context) {
 	var input userModel.UserLoginModel
 
 	if err := c.BindJSON(&input); err != nil {
@@ -174,7 +174,7 @@ func (h *Handler) signInVK(c *gin.Context) {
 // @Failure 500 {object} ResponseMessage
 // @Failure default {object} ResponseMessage
 // @Router /auth/sign-in/oauth2 [post]
-func (h *Handler) signInOAuth2(c *gin.Context) {
+func (h *AuthHandler) signInOAuth2(c *gin.Context) {
 	var input userModel.GoogleOAuth2Code
 
 	if err := c.BindJSON(&input); err != nil {
@@ -215,7 +215,7 @@ func (h *Handler) signInOAuth2(c *gin.Context) {
 // @Failure 500 {object} ResponseMessage
 // @Failure default {object} ResponseMessage
 // @Router /auth/refresh [post]
-func (h *Handler) refresh(c *gin.Context) {
+func (h *AuthHandler) refresh(c *gin.Context) {
 
 	// Получение токена обновления из файла cookie
 	refreshToken, err := c.Cookie(viper.GetString("environment.refresh_token_key"))
@@ -269,7 +269,7 @@ type LogoutOutputModel struct {
 // @Failure 500 {object} ResponseMessage
 // @Failure default {object} ResponseMessage
 // @Router /auth/logout [post]
-func (h *Handler) logout(c *gin.Context) {
+func (h *AuthHandler) logout(c *gin.Context) {
 	refreshToken, err := c.Cookie(viper.GetString("environment.refresh_token_key"))
 
 	if err != nil {
@@ -315,7 +315,7 @@ func (h *Handler) logout(c *gin.Context) {
 // @Failure 500 {object} ResponseMessage
 // @Failure default {object} ResponseMessage
 // @Router /auth/activate [get]
-func (h *Handler) activate(c *gin.Context) {
+func (h *AuthHandler) activate(c *gin.Context) {
 	_, err := h.services.Activate(c.Params.ByName("link"))
 
 	if err != nil {
@@ -340,7 +340,7 @@ func (h *Handler) activate(c *gin.Context) {
 // @Failure 500 {object} ResponseMessage
 // @Failure default {object} ResponseMessage
 // @Router /auth/recovery/password [post]
-func (h *Handler) recoveryPassword(c *gin.Context) {
+func (h *AuthHandler) recoveryPassword(c *gin.Context) {
 	var input userModel.UserEmailModel
 
 	if err := c.BindJSON(&input); err != nil {
@@ -371,7 +371,7 @@ func (h *Handler) recoveryPassword(c *gin.Context) {
 // @Failure 500 {object} ResponseMessage
 // @Failure default {object} ResponseMessage
 // @Router /auth/reset/password [post]
-func (h *Handler) resetPassword(c *gin.Context) {
+func (h *AuthHandler) resetPassword(c *gin.Context) {
 	var input userModel.ResetPasswordModel
 
 	if err := c.BindJSON(&input); err != nil {

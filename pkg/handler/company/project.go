@@ -1,4 +1,4 @@
-package handler
+package company
 
 import (
 	"encoding/json"
@@ -24,7 +24,7 @@ import (
 // @Failure 500 {object} ResponseMessage
 // @Failure default {object} ResponseMessage
 // @Router /company/project/create [post]
-func (h *Handler) createProject(c *gin.Context) {
+func (h *CompanyHandler) createProject(c *gin.Context) {
 	var input projectModel.ProjectModel
 
 	if err := c.BindJSON(&input); err != nil {
@@ -59,7 +59,7 @@ func (h *Handler) createProject(c *gin.Context) {
 // @Failure 500 {object} ResponseMessage
 // @Failure default {object} ResponseMessage
 // @Router /company/project/get [post]
-func (h *Handler) getProject(c *gin.Context) {
+func (h *CompanyHandler) getProject(c *gin.Context) {
 	var input projectModel.ProjectUuidModel
 
 	if err := c.BindJSON(&input); err != nil {
@@ -106,7 +106,7 @@ func (h *Handler) getProject(c *gin.Context) {
 // @Failure 500 {object} ResponseMessage
 // @Failure default {object} ResponseMessage
 // @Router /company/project/get/all [post]
-func (h *Handler) getProjects(c *gin.Context) {
+func (h *CompanyHandler) getProjects(c *gin.Context) {
 	var input projectModel.ProjectCountModel
 
 	if err := c.BindJSON(&input); err != nil {
@@ -142,7 +142,7 @@ func (h *Handler) getProjects(c *gin.Context) {
 // @Failure 500 {object} ResponseMessage
 // @Failure default {object} ResponseMessage
 // @Router /company/project/update/image [post]
-func (h *Handler) projectUpdateImage(c *gin.Context) {
+func (h *CompanyHandler) projectUpdateImage(c *gin.Context) {
 	form, err := c.MultipartForm()
 	if err != nil {
 		utilContext.NewErrorResponse(c, http.StatusInternalServerError, err.Error())
@@ -192,7 +192,7 @@ func (h *Handler) projectUpdateImage(c *gin.Context) {
 // @Failure 500 {object} ResponseMessage
 // @Failure default {object} ResponseMessage
 // @Router /company/project/update [post]
-func (h *Handler) projectUpdate(c *gin.Context) {
+func (h *CompanyHandler) projectUpdate(c *gin.Context) {
 	var input projectModel.ProjectUpdateModel
 
 	if err := c.BindJSON(&input); err != nil {

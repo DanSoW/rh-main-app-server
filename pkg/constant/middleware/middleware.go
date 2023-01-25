@@ -9,8 +9,13 @@ const (
 	TOKEN_API_CTX        = "token_api"
 	DOMAINS_ID           = "domains_id"
 
-	MN_USER_IDENTITY           = "user_identity"
-	MN_USER_IDENTITY_LOGOUT    = "user_identity_logout"
-	MN_USER_IDENTITY_HAS_ROLE  = "user_identity_has_role"
-	MN_USER_IDENTITY_HAS_ROLES = "user_identity_has_roles"
+	MN_UI                                            = "ui"
+	MN_UI_LOGOUT                                     = "ui_logout"
+	MN_UI_HAS_ROLE                                   = "ui_has_role"
+	MN_UI_HAS_ROLES_ADMIN_OR_BUILDER_ADMIN           = "ui_has_roles_admin_or_builder_admin"
+	MN_UI_HAS_ROLES_BUILDER_MANAGER_OR_BUILDER_ADMIN = "ui_has_roles_builder_manager_or_builder_admin"
+	MN_UI_HAS_ROLE_ADMIN                             = "ui_has_role_admin"
+	MN_UI_HAS_ROLE_MANAGER                           = "ui_has_role_manager"
+	MN_UI_HAS_ROLE_BUILDER_MANAGER                   = "ui_has_role_builder_manager"
+	MN_UI_HAS_ROLE_BUILDER_ADMIN                     = "ui_has_role_builder_admin"
 )

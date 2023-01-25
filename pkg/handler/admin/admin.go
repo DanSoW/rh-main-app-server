@@ -1,4 +1,4 @@
-package handler
+package admin
 
 import (
 	pathConstant "main-server/pkg/constant/path"
@@ -22,7 +22,7 @@ import (
 // @Failure 500 {object} ResponseMessage
 // @Failure default {object} ResponseMessage
 // @Router /admin/user/get/all [post]
-func (h *Handler) getAllUsers(c *gin.Context) {
+func (h *AdminHandler) getAllUsers(c *gin.Context) {
 	var data adminModel.UsersResponseModel
 
 	data, err := h.services.Admin.GetAllUsers(c)
@@ -54,7 +54,7 @@ func (h *Handler) getAllUsers(c *gin.Context) {
 // @Failure 500 {object} ResponseMessage
 // @Failure default {object} ResponseMessage
 // @Router /admin/company/create [post]
-func (h *Handler) createCompany(c *gin.Context) {
+func (h *AdminHandler) createCompany(c *gin.Context) {
 	form, err := c.MultipartForm()
 
 	if err != nil {

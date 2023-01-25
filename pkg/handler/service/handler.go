@@ -25,11 +25,12 @@ func NewServiceHandler(root *gin.Engine, services *service.Service) *ServiceHand
 	}
 }
 
+/* Инициализация маршрутов для сервисов */
 func (h *ServiceHandler) InitRoutes(
 	middleware *map[string]func(c *gin.Context),
 ) {
 	// URL: /service
-	service := h.rootHandler.Group(route.SERVICE, (*middleware)[middlewareConstant.MN_USER_IDENTITY])
+	service := h.rootHandler.Group(route.SERVICE, (*middleware)[middlewareConstant.MN_UI])
 	{
 		// URL: /main
 		main := service.Group(route.SERVICE_MAIN)

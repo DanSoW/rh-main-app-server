@@ -1,4 +1,4 @@
-package handler
+package user
 
 import (
 	"encoding/json"
@@ -23,7 +23,7 @@ import (
 // @Failure 500 {object} ResponseMessage
 // @Failure default {object} ResponseMessage
 // @Router /user/profile/get [post]
-func (h *Handler) getProfile(c *gin.Context) {
+func (h *UserHandler) getProfile(c *gin.Context) {
 	data, err := h.services.User.GetProfile(c)
 
 	if err != nil {
@@ -57,7 +57,7 @@ func (h *Handler) getProfile(c *gin.Context) {
 // @Failure 500 {object} ResponseMessage
 // @Failure default {object} ResponseMessage
 // @Router /user/profile/update [post]
-func (h *Handler) updateProfile(c *gin.Context) {
+func (h *UserHandler) updateProfile(c *gin.Context) {
 	var input userModel.UserProfileUpdateDataModel
 
 	if err := c.BindJSON(&input); err != nil {
@@ -85,7 +85,7 @@ func (h *Handler) updateProfile(c *gin.Context) {
 // @Failure 500 {object} ResponseMessage
 // @Failure default {object} ResponseMessage
 // @Router /user/company/get [post]
-func (h *Handler) getUserCompany(c *gin.Context) {
+func (h *UserHandler) getUserCompany(c *gin.Context) {
 	userId, _, domainId, err := utilContext.GetContextUserInfo(c)
 	if err != nil {
 		utilContext.NewErrorResponse(c, http.StatusForbidden, err.Error())
@@ -116,7 +116,7 @@ func (h *Handler) getUserCompany(c *gin.Context) {
 // @Failure 500 {object} ResponseMessage
 // @Failure default {object} ResponseMessage
 // @Router /user/role/get/all [post]
-func (h *Handler) getUserRoles(c *gin.Context) {
+func (h *UserHandler) getUserRoles(c *gin.Context) {
 	userId, _, domainId, err := utilContext.GetContextUserInfo(c)
 	if err != nil {
 		utilContext.NewErrorResponse(c, http.StatusForbidden, err.Error())
@@ -147,7 +147,7 @@ func (h *Handler) getUserRoles(c *gin.Context) {
 // @Failure 500 {object} ResponseMessage
 // @Failure default {object} ResponseMessage
 // @Router /user/access/check [post]
-func (h *Handler) accessCheck(c *gin.Context) {
+func (h *UserHandler) accessCheck(c *gin.Context) {
 	userId, _, domainId, err := utilContext.GetContextUserInfo(c)
 	if err != nil {
 		utilContext.NewErrorResponse(c, http.StatusForbidden, err.Error())
