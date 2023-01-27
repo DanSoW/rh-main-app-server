@@ -15,7 +15,7 @@ type RolePostgres struct {
 	enforcer *casbin.Enforcer
 }
 
-/* Create role service */
+/* Создание нового экземпляра структуры RolePostgres */
 func NewRolePostgres(db *sqlx.DB, enforcer *casbin.Enforcer) *RolePostgres {
 	return &RolePostgres{
 		db:       db,
@@ -23,7 +23,7 @@ func NewRolePostgres(db *sqlx.DB, enforcer *casbin.Enforcer) *RolePostgres {
 	}
 }
 
-/* Get role */
+/* Получение определённой роли пользователя */
 func (r *RolePostgres) GetRole(column, value interface{}) (rbacModel.RoleModel, error) {
 	var user rbacModel.RoleModel
 	query := fmt.Sprintf("SELECT * FROM %s WHERE %s=$1", tableConstants.ROLES_TABLE, column.(string))
@@ -42,6 +42,7 @@ func (r *RolePostgres) GetRole(column, value interface{}) (rbacModel.RoleModel, 
 	return user, err
 }
 
+/* Проверка присутствия у пользователя определённой роли (принадлежность к группе пользователей) */
 func (r *RolePostgres) HasRole(usersId, domainsId int, roleValue string) (bool, error) {
 	data, err := r.GetRole("value", roleValue)
 

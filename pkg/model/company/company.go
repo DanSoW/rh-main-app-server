@@ -1,6 +1,6 @@
 package company
 
-/* Company UUID model */
+/* Модель для UUID компании */
 type ManagerUuidModel struct {
 	CompanyUuid string `json:"company_uuid" binding:"required"`
 	ManagerUuid string `json:"manager_uuid" binding:"required"`
@@ -11,7 +11,7 @@ type CompanyImageModel struct {
 	Filepath string `json:"Filepath" binding:"required"`
 }
 
-/* Model data for company */
+/* Модель данных для компании (элемент data, jsonb) */
 type CompanyModel struct {
 	Logo         string `json:"logo" binding:"required" db:"logo"`
 	Title        string `json:"title" binding:"required" db:"title"`
