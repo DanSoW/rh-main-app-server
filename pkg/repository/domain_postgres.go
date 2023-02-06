@@ -22,7 +22,7 @@ func NewDomainPostgres(db *sqlx.DB) *DomainPostgres {
 /* Get information about domain */
 func (r *DomainPostgres) GetDomain(column, value interface{}) (rbacModel.DomainModel, error) {
 	var domain rbacModel.DomainModel
-	query := fmt.Sprintf("SELECT * FROM %s WHERE %s=$1", tableConstants.DOMAINS_TABLE, column.(string))
+	query := fmt.Sprintf("SELECT * FROM %s WHERE %s=$1", tableConstants.AC_DOMAINS, column.(string))
 
 	var err error
 

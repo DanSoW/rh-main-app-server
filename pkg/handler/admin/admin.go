@@ -4,6 +4,8 @@ import (
 	pathConstant "main-server/pkg/constant/path"
 	utilContext "main-server/pkg/handler/util"
 	adminModel "main-server/pkg/model/admin"
+	httpModel "main-server/pkg/model/http"
+	userModel "main-server/pkg/model/user"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -95,4 +97,50 @@ func (h *AdminHandler) createCompany(c *gin.Context) {
 
 	c.SaveUploadedFile(fileImg, filepath)
 	c.JSON(http.StatusOK, data)
+}
+
+// @Summary SystemUserAddAccess
+// @Tags admin
+// @Description Добавление доступа какому-либо пользователю
+// @ID admin-system-user-add-access
+// @Accept  json
+// @Produce  json
+// @Param Authorization header string true "Токен доступа для текущего пользователя" example(Bearer access_token)
+// @Param input body adminModel.SystemPermissionModel true "credentials"
+// @Success 200 {object} httpModel.ResponseValue "data"
+// @Failure 400,404 {object} ResponseMessage
+// @Failure 500 {object} ResponseMessage
+// @Failure default {object} ResponseMessage
+// @Router /admin/system/user/add/access [post]
+func (h *AdminHandler) systemUserAddAccess(c *gin.Context) {
+	// Получение пользовательских данных обработанных с помощью цепочки middleware
+	userId, userUuid, domainId, err := utilContext.GetContextUserInfo(c)
+	if err != nil {
+		utilContext.NewErrorResponse(c, http.StatusForbidden, err.Error())
+		return
+	}
+
+	// Получение данных из запроса
+	var input adminModel.SystemPermissionModel
+	if err := c.Bind(&input); err != nil {
+		utilContext.NewErrorResponse(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Отправка данных на слой сервисов
+	data, err := h.services.Admin.SystemAddManager(&userModel.UserIdentityModel{
+		UserId:   userId,
+		UserUuid: userUuid,
+		DomainId: domainId,
+	}, input)
+
+	if err != nil {
+		utilContext.NewErrorResponse(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// Возвращение результата
+	c.JSON(http.StatusOK, httpModel.ResponseValue{
+		Value: data,
+	})
 }

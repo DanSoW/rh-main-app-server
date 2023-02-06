@@ -44,7 +44,7 @@ type User interface {
 	GetUser(column, value interface{}) (userModel.UserModel, error)
 	GetProfile(c *gin.Context) (userModel.UserProfileModel, error)
 	UpdateProfile(c *gin.Context, data userModel.UserProfileUpdateDataModel) (userModel.UserJSONBModel, error)
-	GetUserCompany(userId, domainId int) (companyModel.CompanyDbModelEx, error)
+	GetUserCompany(userId, domainId int) (companyModel.CompanyInfoModelEx, error)
 	AccessCheck(userId, domainId int, value rbacModel.RoleValueModel) (bool, error)
 	GetAllRoles(user userModel.UserIdentityModel) (*userModel.UserRoleModel, error)
 }
@@ -52,6 +52,7 @@ type User interface {
 type Admin interface {
 	GetAllUsers(c *gin.Context) (adminModel.UsersResponseModel, error)
 	CreateCompany(c *gin.Context, data adminModel.CompanyModel) (adminModel.CompanyModel, error)
+	SystemAddManager(user *userModel.UserIdentityModel, data adminModel.SystemPermissionModel) (bool, error)
 }
 
 type AuthType interface {
@@ -59,10 +60,10 @@ type AuthType interface {
 }
 
 type Project interface {
-	CreateProject(userId, domainId int, data projectModel.ProjectModel) (projectModel.ProjectModel, error)
+	CreateProject(userId, domainId int, data projectModel.ProjectCreateModel) (projectModel.ProjectCreateModel, error)
 	ProjectUpdate(user userModel.UserIdentityModel, data projectModel.ProjectUpdateModel) (projectModel.ProjectUpdateModel, error)
-	ProjectUpdateImage(userId, domainId int, data projectModel.ProjectImageModel) (projectModel.ProjectImageModel, error)
-	GetProject(userId, domainId int, data projectModel.ProjectUuidModel) (projectModel.ProjectDbModel, error)
+	ProjectUpdateImage(userId, domainId int, data projectModel.ProjectImgModel) (projectModel.ProjectImgModel, error)
+	GetProject(userId, domainId int, data projectModel.ProjectUuidModel) (projectModel.ProjectLowInfoModel, error)
 	GetProjects(userId, domainId int, data projectModel.ProjectCountModel) (projectModel.ProjectAnyCountModel, error)
 }
 
@@ -85,6 +86,17 @@ type ExcelAnalysis interface {
 	GetHeaderInfoDocument(document excelModel.DocumentIdModel) (infoModel.HeaderInfoModel, error)
 }
 
+/* Интерфейс репозитория для таблицы ac_objects */
+type Object interface {
+	GetObject(column, value interface{}) (*rbacModel.ObjectDbModel, error)
+	AddResource(resource *rbacModel.ResourceModel) (*rbacModel.ObjectDbModel, error)
+}
+
+/* Интерфейс репозитория для таблицы ac_types_objects */
+type TypeObject interface {
+	GetTypeObject(column, value interface{}) (rbacModel.TypeObjectDbModel, error)
+}
+
 type Repository struct {
 	Authorization
 	Role
@@ -97,6 +109,8 @@ type Repository struct {
 	Wrapper
 	ServiceMain
 	ExcelAnalysis
+	Object
+	TypeObject
 }
 
 func NewRepository(db *sqlx.DB, enforcer *casbin.Enforcer) *Repository {
@@ -105,10 +119,11 @@ func NewRepository(db *sqlx.DB, enforcer *casbin.Enforcer) *Repository {
 	domain := NewDomainPostgres(db)
 	role := NewRolePostgres(db, enforcer)
 	user := NewUserPostgres(db, enforcer, domain, role)
-	admin := NewAdminPostgres(db, enforcer, domain, role)
-	project := NewProjectPostgres(db, enforcer, role)
+	admin := NewAdminPostgres(db, enforcer, domain, role, user)
+	project := NewProjectPostgres(db, enforcer, role, user)
 	company := NewCompanyPostgres(db, enforcer, role, user, wrapper)
 	serviceMain := NewServiceMainRepository(db, enforcer, user)
+	acTypeObject := NewTypeObjectPostgres(db)
 
 	return &Repository{
 		Authorization: NewAuthPostgres(db, enforcer, *user),
@@ -122,5 +137,7 @@ func NewRepository(db *sqlx.DB, enforcer *casbin.Enforcer) *Repository {
 		Wrapper:       wrapper,
 		ServiceMain:   serviceMain,
 		ExcelAnalysis: NewExcelAnalysis(),
+		Object:        NewObjectPostgres(db, acTypeObject),
+		TypeObject:    acTypeObject,
 	}
 }

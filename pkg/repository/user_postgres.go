@@ -45,7 +45,7 @@ func NewUserPostgres(
 
 func (r *UserPostgres) GetUser(column, value interface{}) (userModel.UserModel, error) {
 	var user userModel.UserModel
-	query := fmt.Sprintf("SELECT * FROM %s WHERE %s=$1", tableConstant.USERS_TABLE, column.(string))
+	query := fmt.Sprintf("SELECT * FROM %s WHERE %s=$1", tableConstant.U_USERS, column.(string))
 
 	var err error
 
@@ -68,7 +68,7 @@ func (r *UserPostgres) GetProfile(c *gin.Context) (userModel.UserProfileModel, e
 	var email userModel.UserEmailModel
 
 	query := fmt.Sprintf("SELECT data FROM %s tl WHERE tl.users_id = $1 LIMIT 1",
-		tableConstant.USERS_DATA_TABLE,
+		tableConstant.U_USERS_DATA,
 	)
 
 	err := r.db.Get(&profile, query, usersId)
@@ -76,7 +76,7 @@ func (r *UserPostgres) GetProfile(c *gin.Context) (userModel.UserProfileModel, e
 		return userModel.UserProfileModel{}, err
 	}
 
-	query = fmt.Sprintf("SELECT email FROM %s tl WHERE tl.id = $1 LIMIT 1", tableConstant.USERS_TABLE)
+	query = fmt.Sprintf("SELECT email FROM %s tl WHERE tl.id = $1 LIMIT 1", tableConstant.U_USERS)
 
 	err = r.db.Get(&email, query, usersId)
 	if err != nil {
@@ -102,7 +102,7 @@ func (r *UserPostgres) UpdateProfile(c *gin.Context, data userModel.UserProfileU
 		return userModel.UserJSONBModel{}, err
 	}
 
-	query := fmt.Sprintf("UPDATE %s tl SET data=$1 WHERE tl.users_id = $2", tableConstant.USERS_DATA_TABLE)
+	query := fmt.Sprintf("UPDATE %s tl SET data=$1 WHERE tl.users_id = $2", tableConstant.U_USERS_DATA)
 
 	// Update data about user profile
 	_, err = tx.Exec(query, userJsonb, usersId)
@@ -111,7 +111,7 @@ func (r *UserPostgres) UpdateProfile(c *gin.Context, data userModel.UserProfileU
 		return userModel.UserJSONBModel{}, err
 	}
 
-	query = fmt.Sprintf("SELECT data FROM %s tl WHERE users_id=$1 LIMIT 1", tableConstant.USERS_DATA_TABLE)
+	query = fmt.Sprintf("SELECT data FROM %s tl WHERE users_id=$1 LIMIT 1", tableConstant.U_USERS_DATA)
 	var userData []userModel.UserDataModel
 
 	err = r.db.Select(&userData, query, usersId)
@@ -142,7 +142,7 @@ func (r *UserPostgres) UpdateProfile(c *gin.Context, data userModel.UserProfileU
 			return userModel.UserJSONBModel{}, err
 		}
 
-		query := fmt.Sprintf("UPDATE %s SET password=$1 WHERE id=$2", tableConstant.USERS_TABLE)
+		query := fmt.Sprintf("UPDATE %s SET password=$1 WHERE id=$2", tableConstant.U_USERS)
 		_, err = r.db.Exec(query, string(hashedPassword), usersId)
 
 		if err != nil {
@@ -162,7 +162,7 @@ func (r *UserPostgres) UpdateProfile(c *gin.Context, data userModel.UserProfileU
 }
 
 /* Get information about company for current user */
-func (r *UserPostgres) GetUserCompany(userId, domainId int) (companyModel.CompanyDbModelEx, error) {
+func (r *UserPostgres) GetUserCompany(userId, domainId int) (companyModel.CompanyInfoModelEx, error) {
 	query := fmt.Sprintf(`
 			SELECT DISTINCT tl.value, trule.v3
 			FROM %s tl
@@ -172,7 +172,7 @@ func (r *UserPostgres) GetUserCompany(userId, domainId int) (companyModel.Compan
 					AND trule.v0 = $2 
 					AND trule.ptype = 'p'
 					AND (trule.v3 = $3 OR trule.v3 = $4)
-	`, tableConstant.OBJECTS_TABLE, tableConstant.TYPES_OBJECTS_TABLE, tableConstant.RULES_TABLE)
+	`, tableConstant.AC_OBJECTS, tableConstant.AC_TYPES_OBJECTS, tableConstant.AC_RULES)
 
 	var companies []companyModel.CompanyRuleModelEx
 	err := r.db.Select(&companies, query,
@@ -181,11 +181,11 @@ func (r *UserPostgres) GetUserCompany(userId, domainId int) (companyModel.Compan
 	)
 
 	if err != nil {
-		return companyModel.CompanyDbModelEx{}, err
+		return companyModel.CompanyInfoModelEx{}, err
 	}
 
 	if len(companies) <= 0 {
-		return companyModel.CompanyDbModelEx{}, nil
+		return companyModel.CompanyInfoModelEx{}, nil
 	}
 
 	company := companies[len(companies)-1]
@@ -195,21 +195,21 @@ func (r *UserPostgres) GetUserCompany(userId, domainId int) (companyModel.Compan
 		return x[len(x)-1]
 	})
 
-	var companyInfo companyModel.CompanyDbModel
-	query = fmt.Sprintf(`SELECT uuid, data, created_at FROM %s tl WHERE tl.uuid = $1 LIMIT 1`, tableConstant.COMPANIES_TABLE)
+	var companyInfo companyModel.CompanyInfoModel
+	query = fmt.Sprintf(`SELECT uuid, data, created_at FROM %s tl WHERE tl.uuid = $1 LIMIT 1`, tableConstant.CB_COMPANIES)
 
 	err = r.db.Get(&companyInfo, query, company.Value)
 	if err != nil {
-		return companyModel.CompanyDbModelEx{}, err
+		return companyModel.CompanyInfoModelEx{}, err
 	}
 
 	var companyDataEx companyModel.CompanyModel
 	err = json.Unmarshal([]byte(companyInfo.Data), &companyDataEx)
 	if err != nil {
-		return companyModel.CompanyDbModelEx{}, err
+		return companyModel.CompanyInfoModelEx{}, err
 	}
 
-	return companyModel.CompanyDbModelEx{
+	return companyModel.CompanyInfoModelEx{
 		Uuid:      companyInfo.Uuid,
 		Data:      companyDataEx,
 		CreatedAt: companyInfo.CreatedAt,
@@ -243,7 +243,7 @@ func (r *UserPostgres) GetAllRoles(user userModel.UserIdentityModel) (*userModel
 			WHERE
 				tr.v2 = $1 AND 
 				tr.v0 = $2
-	`, tableConstant.RULES_TABLE, tableConstant.ROLES_TABLE)
+	`, tableConstant.AC_RULES, tableConstant.AC_ROLES)
 
 	var roles []string
 

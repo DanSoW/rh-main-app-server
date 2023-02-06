@@ -26,7 +26,7 @@ func NewRolePostgres(db *sqlx.DB, enforcer *casbin.Enforcer) *RolePostgres {
 /* Получение определённой роли пользователя */
 func (r *RolePostgres) GetRole(column, value interface{}) (rbacModel.RoleModel, error) {
 	var user rbacModel.RoleModel
-	query := fmt.Sprintf("SELECT * FROM %s WHERE %s=$1", tableConstants.ROLES_TABLE, column.(string))
+	query := fmt.Sprintf("SELECT * FROM %s WHERE %s=$1", tableConstants.AC_ROLES, column.(string))
 
 	var err error
 

@@ -7,4 +7,5 @@ const (
 	GET_ROUTE     = "/get"
 	GET_ALL_ROUTE = "/get/all"
 	DELETE_ROUTE  = "/delete"
+	ADD_ROUTE     = "/add"
 )

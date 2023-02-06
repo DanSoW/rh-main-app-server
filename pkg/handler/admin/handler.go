@@ -4,7 +4,6 @@ import (
 	_ "main-server/docs"
 
 	middlewareConstant "main-server/pkg/constant/middleware"
-	roleConstant "main-server/pkg/constant/role"
 	"main-server/pkg/constant/route"
 	service "main-server/pkg/service"
 
@@ -30,8 +29,9 @@ func (h *AdminHandler) InitRoutes(
 	middleware *map[string]func(c *gin.Context),
 	hasRole func(role string) func(c *gin.Context),
 ) {
+	// route.ADMIN_MAIN_ROUTE, (*middleware)[middlewareConstant.MN_UI], hasRole(roleConstant.ROLE_ADMIN)
 	// URL: /admin
-	admin := h.rootHandler.Group(route.ADMIN_MAIN_ROUTE, (*middleware)[middlewareConstant.MN_UI], hasRole(roleConstant.ROLE_ADMIN))
+	admin := h.rootHandler.Group(route.ADMIN_MAIN_ROUTE, (*middleware)[middlewareConstant.MN_UI])
 	{
 		// URL: /admin/user
 		user := admin.Group(route.ADMIN_USER)
@@ -45,6 +45,13 @@ func (h *AdminHandler) InitRoutes(
 		{
 			// URL: /admin/company/create
 			company.POST(route.CREATE_ROUTE, h.createCompany)
+		}
+
+		// URL: /admin/system
+		system := admin.Group(route.SYSTEM)
+		{
+			// URL: /admin/system/user/add/access
+			system.POST(route.USER_MAIN_ROUTE+route.ADD_ROUTE+route.ACCESS, h.systemUserAddAccess)
 		}
 	}
 }

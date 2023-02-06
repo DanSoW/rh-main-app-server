@@ -11,3 +11,14 @@ const (
 	ADMINISTRATION = "administration"
 	MANAGEMENT     = "management"
 )
+
+func GetSlice() []string {
+	return []string{
+		CREATE,
+		MODIFY,
+		DELETE,
+		READ,
+		ADMINISTRATION,
+		MANAGEMENT,
+	}
+}

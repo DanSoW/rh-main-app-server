@@ -25,7 +25,7 @@ import (
 // @Failure default {object} ResponseMessage
 // @Router /company/project/create [post]
 func (h *CompanyHandler) createProject(c *gin.Context) {
-	var input projectModel.ProjectModel
+	var input projectModel.ProjectCreateModel
 
 	if err := c.BindJSON(&input); err != nil {
 		utilContext.NewErrorResponse(c, http.StatusInternalServerError, err.Error())
@@ -165,7 +165,7 @@ func (h *CompanyHandler) projectUpdateImage(c *gin.Context) {
 	data, err := h.services.Project.ProjectUpdateImage(
 		userId,
 		domainId,
-		projectModel.ProjectImageModel{
+		projectModel.ProjectImgModel{
 			Filepath: filepath,
 			Uuid:     projectUuid,
 		},

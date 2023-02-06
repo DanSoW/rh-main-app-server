@@ -3,6 +3,7 @@ package repository
 import (
 	//middlewareConstant "main-server/pkg/constant/middleware"
 	"encoding/json"
+	"errors"
 	"fmt"
 	actionConstant "main-server/pkg/constant/action"
 	middlewareConstant "main-server/pkg/constant/middleware"
@@ -27,6 +28,7 @@ type AdminPostgres struct {
 	enforcer *casbin.Enforcer
 	domain   *DomainPostgres
 	role     *RolePostgres
+	user     *UserPostgres
 }
 
 /* Function for create new struct of AdminPostgres */
@@ -35,19 +37,21 @@ func NewAdminPostgres(
 	enforcer *casbin.Enforcer,
 	domain *DomainPostgres,
 	role *RolePostgres,
+	user *UserPostgres,
 ) *AdminPostgres {
 	return &AdminPostgres{
 		db:       db,
 		enforcer: enforcer,
 		domain:   domain,
 		role:     role,
+		user:     user,
 	}
 }
 
 /* Метод для получения информации обо всех пользователях */
 func (r *AdminPostgres) GetAllUsers(c *gin.Context) (adminModel.UsersResponseModel, error) {
 	// Получение email-адресов всех пользователей
-	query := fmt.Sprintf(`SELECT email FROM %s`, tableConstant.USERS_TABLE)
+	query := fmt.Sprintf(`SELECT email FROM %s`, tableConstant.U_USERS)
 	var users []adminModel.UserResponseModel
 
 	if err := r.db.Select(&users, query); err != nil {
@@ -71,7 +75,7 @@ func (r *AdminPostgres) CreateCompany(c *gin.Context, data adminModel.CompanyMod
 		return adminModel.CompanyModel{}, err
 	}
 
-	query := fmt.Sprintf("INSERT INTO %s (uuid, data, created_at, updated_at, users_id) values ($1, $2, $3, $4, $5) RETURNING id", tableConstant.COMPANIES_TABLE)
+	query := fmt.Sprintf("INSERT INTO %s (uuid, data, created_at, updated_at, users_id) values ($1, $2, $3, $4, $5) RETURNING id", tableConstant.CB_COMPANIES)
 
 	/* Добавление новой компании */
 	dataJson, err := json.Marshal(data)
@@ -98,7 +102,7 @@ func (r *AdminPostgres) CreateCompany(c *gin.Context, data adminModel.CompanyMod
 	/* Добавление информации о новом объекте (объект в данном случае - это компания) */
 	var typesObjects rbacModel.TypesObjectsModel
 
-	query = fmt.Sprintf("SELECT * FROM %s WHERE value=$1", tableConstant.TYPES_OBJECTS_TABLE)
+	query = fmt.Sprintf("SELECT * FROM %s WHERE value=$1", tableConstant.AC_TYPES_OBJECTS)
 
 	err = r.db.Get(&typesObjects, query, objectConstant.TYPE_COMPANY)
 	if err != nil {
@@ -106,7 +110,7 @@ func (r *AdminPostgres) CreateCompany(c *gin.Context, data adminModel.CompanyMod
 		return adminModel.CompanyModel{}, err
 	}
 
-	query = fmt.Sprintf("INSERT INTO %s (value, types_objects_id) values ($1, $2)", tableConstant.OBJECTS_TABLE)
+	query = fmt.Sprintf("INSERT INTO %s (value, types_objects_id) values ($1, $2)", tableConstant.AC_OBJECTS)
 
 	_, err = tx.Exec(query, companyUuid, typesObjects.Id)
 	if err != nil {
@@ -117,7 +121,7 @@ func (r *AdminPostgres) CreateCompany(c *gin.Context, data adminModel.CompanyMod
 	/* Добавление информации о пользователе в текущей компании */
 	// Осуществление поиска пользователя по его email-адресу
 	var user userModel.UserModel
-	query = fmt.Sprintf("SELECT * FROM %s tl WHERE tl.email=$1", tableConstant.USERS_TABLE)
+	query = fmt.Sprintf("SELECT * FROM %s tl WHERE tl.email=$1", tableConstant.U_USERS)
 	err = r.db.Get(&user, query, data.EmailAdmin)
 	if err != nil {
 		tx.Rollback()
@@ -144,7 +148,7 @@ func (r *AdminPostgres) CreateCompany(c *gin.Context, data adminModel.CompanyMod
 	query = fmt.Sprintf(`
 		INSERT INTO %s (uuid, data, created_at, updated_at, users_id, companies_id) 
 		values ($1, $2, $3, $4, $5, $6) RETURNING id`,
-		tableConstant.WORKERS_TABLE,
+		tableConstant.CB_WORKERS,
 	)
 	var workerId int
 	row = tx.QueryRow(query, uuid.NewV4().String(), roleAdminJson, currentDate, currentDate, user.Id, companyId)
@@ -185,7 +189,7 @@ func (r *AdminPostgres) CreateCompany(c *gin.Context, data adminModel.CompanyMod
 	}
 
 	// Get id for user admin
-	query = fmt.Sprintf("SELECT id FROM %s WHERE email=$1 LIMIT 1", tableConstant.USERS_TABLE)
+	query = fmt.Sprintf("SELECT id FROM %s WHERE email=$1 LIMIT 1", tableConstant.U_USERS)
 	var userAdminId int
 
 	row = r.db.QueryRow(query, data.EmailAdmin)
@@ -220,4 +224,49 @@ func (r *AdminPostgres) CreateCompany(c *gin.Context, data adminModel.CompanyMod
 	}
 
 	return data, nil
+}
+
+/* Метод структуры для создания нового менеджера в системе */
+func (r *AdminPostgres) SystemAddManager(user *userModel.UserIdentityModel, data adminModel.SystemPermissionModel) (bool, error) {
+	check, err := data.Check(r.db)
+
+	if err != nil {
+		return false, err
+	}
+
+	if !check {
+		return false, errors.New("Ошибка: входная модель не валидна")
+	}
+
+	roleInfo, err := r.role.GetRole("uuid", *data.RoleUuid)
+
+	if err != nil {
+		return false, err
+	}
+
+	userInfo, err := r.user.GetUser("email", data.Email)
+
+	if err != nil {
+		return false, err
+	}
+
+	// Добавление новой роли пользователю
+	if data.RoleUuid != nil {
+		_, err := r.enforcer.AddRoleForUserInDomain(strconv.Itoa(userInfo.Id), strconv.Itoa(roleInfo.Id), strconv.Itoa(user.DomainId))
+
+		if err != nil {
+			return false, err
+		}
+	}
+
+	// Добавление новых прав пользователю
+	if len(data.PermissionList) > 0 {
+		for _, item := range data.PermissionList {
+			for _, subItem := range item.ActionList {
+				r.enforcer.AddPolicy(strconv.Itoa(userInfo.Id), strconv.Itoa(user.DomainId), item.ObjectUuid, subItem)
+			}
+		}
+	}
+
+	return true, nil
 }

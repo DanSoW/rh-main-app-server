@@ -9,10 +9,12 @@ import (
 	objectConstant "main-server/pkg/constant/object"
 	roleConstant "main-server/pkg/constant/role"
 	tableConstant "main-server/pkg/constant/table"
+	companyModel "main-server/pkg/model/company"
 	projectModel "main-server/pkg/model/project"
 	rbacModel "main-server/pkg/model/rbac"
 	userModel "main-server/pkg/model/user"
 	"main-server/pkg/model/worker"
+	workerModel "main-server/pkg/model/worker"
 	"sort"
 
 	"strconv"
@@ -27,64 +29,119 @@ type ProjectPostgres struct {
 	db       *sqlx.DB
 	enforcer *casbin.Enforcer
 	role     *RolePostgres
+	user     *UserPostgres
 }
 
-/* Function for create new struct of AdminPostgres */
-func NewProjectPostgres(db *sqlx.DB, enforcer *casbin.Enforcer, role *RolePostgres) *ProjectPostgres {
+/* Функция создания нового экземпляра структуры ProjectPostgres */
+func NewProjectPostgres(db *sqlx.DB, enforcer *casbin.Enforcer, role *RolePostgres, user *UserPostgres) *ProjectPostgres {
 	return &ProjectPostgres{
 		db:       db,
 		enforcer: enforcer,
 		role:     role,
+		user:     user,
 	}
 }
 
-func (r *ProjectPostgres) CreateProject(userId, domainId int, data projectModel.ProjectModel) (projectModel.ProjectModel, error) {
+/* Функция создания нового проекта */
+func (r *ProjectPostgres) CreateProject(userId, domainId int, data projectModel.ProjectCreateModel) (projectModel.ProjectCreateModel, error) {
+	// Начало транзакции
 	tx, err := r.db.Begin()
 	if err != nil {
-		return projectModel.ProjectModel{}, err
+		return projectModel.ProjectCreateModel{}, err
 	}
 
-	query := fmt.Sprintf("SELECT id FROM %s WHERE uuid=$1", tableConstant.COMPANIES_TABLE)
-	var companyId int
+	// Получение информации о компании
+	query := fmt.Sprintf("SELECT * FROM %s WHERE uuid=$1", tableConstant.CB_COMPANIES)
+	var company companyModel.CompanyDbModel
 
-	row := r.db.QueryRow(query, data.Uuid)
-	if err := row.Scan(&companyId); err != nil {
+	row := r.db.QueryRow(query, data.CompanyUuid)
+	if err := row.Scan(&company); err != nil {
 		tx.Rollback()
-		return projectModel.ProjectModel{}, err
+		return projectModel.ProjectCreateModel{}, err
 	}
 
-	query = fmt.Sprintf("INSERT INTO %s (uuid, data, created_at, updated_at, users_id, companies_id) values ($1, $2, $3, $4, $5, $6) RETURNING id", tableConstant.PROJECTS_TABLE)
+	/* Процесс определения менеджера, который будет менеджером для данного проекта */
+	// Определение пользователя в системе
+	manager, err := r.user.GetUser("email", data.Manager.Email)
+	if err != nil {
+		tx.Rollback()
+		return projectModel.ProjectCreateModel{}, err
+	}
 
-	dataJson, err := json.Marshal(projectModel.ProjectDataModel{
+	// Определяем, присутствует ли пользователь в других компаниях
+	query = fmt.Sprintf("SELECT * FROM %s WHERE companies_id != $1")
+	var workers []workerModel.WorkerDbModel
+	err = r.db.Select(&workers, query, company.Id)
+	if err != nil {
+		tx.Rollback()
+		return projectModel.ProjectCreateModel{}, err
+	}
+
+	if len(workers) > 0 {
+		tx.Rollback()
+		return projectModel.ProjectCreateModel{}, errors.New("Ошибка: данный пользователь уже является менеджеров в другой компании")
+	}
+
+	// Проверка на существование пользователя в системе
+	query = fmt.Sprintf("SELECT * FROM %s WHERE companies_id=$1 and users_id=$2", tableConstant.CB_WORKERS)
+	err = r.db.Select(&workers, query, company.Id, manager.Id)
+	if err != nil {
+		tx.Rollback()
+		return projectModel.ProjectCreateModel{}, err
+	}
+
+	// Идентификатор работника (worker'a)
+	var workerId int
+
+	// Если пользователь ещё не был добавлен в компанию (ещё обычный пользователь)
+	if len(workers) <= 0 {
+		// Добавление новой записи работника в систему
+		query = fmt.Sprintf(`
+				INSERT INTO %s (uuid, data, created_at, updated_at, users_id, companies_id) 
+				values ($1, $2, $3, $4, $5, $6) RETURNING id`,
+			tableConstant.CB_WORKERS,
+		)
+
+		row = tx.QueryRow(query, uuid.NewV4().String(), "", time.Now(), time.Now(), manager.Id, company.Id)
+		if err := row.Scan(&workerId); err != nil {
+			tx.Rollback()
+			return projectModel.ProjectCreateModel{}, err
+		}
+	} else {
+		// Получение id работника
+		workerId = workers[len(workers)-1].Id
+	}
+
+	/* Процесс добавления информации о проекте в компанию*/
+	// Добавление информации о проекте
+	query = fmt.Sprintf("INSERT INTO %s (uuid, data, created_at, updated_at, workers_id, companies_id) values ($1, $2, $3, $4, $5, $6);", tableConstant.CB_PROJECTS)
+
+	dataJson, err := json.Marshal(projectModel.ProjectDataDbModel{
+		Logo:        *data.Logo,
 		Title:       data.Title,
 		Description: data.Description,
-		Managers:    data.Managers,
 	})
 
 	if err != nil {
 		tx.Rollback()
-		return projectModel.ProjectModel{}, err
+		return projectModel.ProjectCreateModel{}, err
 	}
 
-	currentDate := time.Now()
+	// Добавление информации о проекте в БД
 	projectUuid := uuid.NewV4()
-
-	var projectId int
-	row = tx.QueryRow(query, projectUuid, dataJson, currentDate, currentDate, userId, companyId)
-	if err := row.Scan(&projectId); err != nil {
-		tx.Rollback()
-		return projectModel.ProjectModel{}, err
-	}
-
+	row = tx.QueryRow(query, projectUuid, dataJson, time.Now(), time.Now(), workerId, company.Id)
 	if err != nil {
 		tx.Rollback()
-		return projectModel.ProjectModel{}, err
+		return projectModel.ProjectCreateModel{}, err
 	}
+
+	// Добавление пользователя в группу менеджеров в рамку данного проекта
+	//rbacModel.NewGPSubjectModel()
 
 	roleBuilderManager, err := r.role.GetRole("value", roleConstant.ROLE_BUILDER_MANAGER)
 	if err != nil {
 		tx.Rollback()
-		return projectModel.ProjectModel{}, err
+		return projectModel.ProjectCreateModel{}, err
 	}
 
 	roleBuilderManagerJson, err := json.Marshal(worker.WorkerModel{
@@ -93,67 +150,67 @@ func (r *ProjectPostgres) CreateProject(userId, domainId int, data projectModel.
 
 	if err != nil {
 		tx.Rollback()
-		return projectModel.ProjectModel{}, err
+		return projectModel.ProjectCreateModel{}, err
 	}
 
 	query = fmt.Sprintf(`
 	INSERT INTO %s (uuid, data, created_at, updated_at, users_id, companies_id) 
 	values ($1, $2, $3, $4, $5, $6) RETURNING id`,
-		tableConstant.WORKERS_TABLE,
+		tableConstant.CB_WORKERS,
 	)
 
-	for _, element := range data.Managers {
+	for _, element := range data.Manager {
 		var user userModel.UserModel
-		queryLocal := fmt.Sprintf("SELECT * FROM %s tl WHERE tl.email=$1", tableConstant.USERS_TABLE)
+		queryLocal := fmt.Sprintf("SELECT * FROM %s tl WHERE tl.email=$1", tableConstant.U_USERS)
 		err = r.db.Get(&user, queryLocal, element.Email)
 		if err != nil {
 			tx.Rollback()
-			return projectModel.ProjectModel{}, err
+			return projectModel.ProjectCreateModel{}, err
 		}
 
-		queryFindWorker := fmt.Sprintf("SELECT * FROM %s tl WHERE tl.users_id = $1", tableConstant.WORKERS_TABLE)
+		queryFindWorker := fmt.Sprintf("SELECT * FROM %s tl WHERE tl.users_id = $1", tableConstant.CB_WORKERS)
 		var workers []int
 		err = r.db.Select(&workers, queryFindWorker, user.Id)
 
 		var workerId int
-		row = tx.QueryRow(query, uuid.NewV4().String(), roleBuilderManagerJson, currentDate, currentDate, user.Id, companyId)
+		row = tx.QueryRow(query, uuid.NewV4().String(), roleBuilderManagerJson, currentDate, currentDate, user.Id, company)
 		if err := row.Scan(&workerId); err != nil {
 			tx.Rollback()
-			return projectModel.ProjectModel{}, err
+			return projectModel.ProjectCreateModel{}, err
 		}
 
 		queryLocal = fmt.Sprintf(`
-		INSERT INTO %s (workers_id, projects_id) 
-		values ($1, $2)`,
+			INSERT INTO %s (workers_id, projects_id) 
+				values ($1, $2)`,
 			tableConstant.WORKERS_PROJECTS_TABLE,
 		)
 
 		_, err = tx.Exec(queryLocal, workerId, projectId)
 		if err != nil {
 			tx.Rollback()
-			return projectModel.ProjectModel{}, err
+			return projectModel.ProjectCreateModel{}, err
 		}
 	}
 
 	// Adding information about a resource
 	var typesObjects rbacModel.TypesObjectsModel
 
-	query = fmt.Sprintf("SELECT * FROM %s WHERE value=$1", tableConstant.TYPES_OBJECTS_TABLE)
+	query = fmt.Sprintf("SELECT * FROM %s WHERE value=$1", tableConstant.AC_TYPES_OBJECTS)
 
 	err = r.db.Get(&typesObjects, query, objectConstant.TYPE_PROJECT)
 	if err != nil {
 		tx.Rollback()
-		return projectModel.ProjectModel{}, err
+		return projectModel.ProjectCreateModel{}, err
 	}
 
 	fmt.Println(typesObjects.Id)
 
-	query = fmt.Sprintf(`INSERT INTO %s (value, types_objects_id) values ($1, $2)`, tableConstant.OBJECTS_TABLE)
+	query = fmt.Sprintf(`INSERT INTO %s (value, types_objects_id) values ($1, $2)`, tableConstant.AC_OBJECTS)
 
 	_, err = tx.Exec(query, projectUuid.String(), typesObjects.Id)
 	if err != nil {
 		tx.Rollback()
-		return projectModel.ProjectModel{}, err
+		return projectModel.ProjectCreateModel{}, err
 	}
 
 	var userIdStr string = strconv.Itoa(userId)
@@ -169,13 +226,13 @@ func (r *ProjectPostgres) CreateProject(userId, domainId int, data projectModel.
 
 	if err != nil {
 		tx.Rollback()
-		return projectModel.ProjectModel{}, err
+		return projectModel.ProjectCreateModel{}, err
 	}
 
 	// Get ids for user managers
-	query = fmt.Sprintf("SELECT id FROM %s WHERE email=$1 LIMIT 1", tableConstant.USERS_TABLE)
+	query = fmt.Sprintf("SELECT id FROM %s WHERE email=$1 LIMIT 1", tableConstant.U_USERS)
 
-	for _, element := range data.Managers {
+	for _, element := range data.Manager {
 		// @(idea):
 		// Можно улучшить данный фрагмент кода добавив сюда определение функции транзакции,
 		// которая бы выполнялась в текущей транзакции
@@ -204,7 +261,7 @@ func (r *ProjectPostgres) CreateProject(userId, domainId int, data projectModel.
 			{userIdStr, domainIdStr, projectUuid.String(), actionConstant.ADMINISTRATION},
 		})
 
-		for _, element := range data.Managers {
+		for _, element := range data.Manager {
 			var userManagerId int
 			row := r.db.QueryRow(query, element.Email)
 			if err := row.Scan(&userManagerId); err != nil {
@@ -220,23 +277,23 @@ func (r *ProjectPostgres) CreateProject(userId, domainId int, data projectModel.
 		}
 
 		tx.Rollback()
-		return projectModel.ProjectModel{}, err
+		return projectModel.ProjectCreateModel{}, err
 	}
 
-	return projectModel.ProjectModel{
+	return projectModel.ProjectCreateModel{
 		Logo:        data.Logo,
 		Title:       data.Title,
 		Description: data.Description,
-		Managers:    data.Managers,
-		Uuid:        projectUuid.String(),
+		Manager:     data.Manager,
+		CompanyUuid: projectUuid.String(),
 	}, nil
 }
 
 /* Add logo project */
-func (r *ProjectPostgres) ProjectUpdateImage(userId, domainId int, data projectModel.ProjectImageModel) (projectModel.ProjectImageModel, error) {
+func (r *ProjectPostgres) ProjectUpdateImage(userId, domainId int, data projectModel.ProjectImgModel) (projectModel.ProjectImgModel, error) {
 	tx, err := r.db.Begin()
 	if err != nil {
-		return projectModel.ProjectImageModel{}, err
+		return projectModel.ProjectImgModel{}, err
 	}
 
 	userIdStr := strconv.Itoa(userId)
@@ -246,41 +303,41 @@ func (r *ProjectPostgres) ProjectUpdateImage(userId, domainId int, data projectM
 	access, err := r.enforcer.Enforce(userIdStr, domainIdStr, data.Uuid, actionConstant.MODIFY)
 	if err != nil {
 		tx.Rollback()
-		return projectModel.ProjectImageModel{}, err
+		return projectModel.ProjectImgModel{}, err
 	}
 
 	if !access {
 		tx.Rollback()
-		return projectModel.ProjectImageModel{}, errors.New("Ошибка! Нет доступа!")
+		return projectModel.ProjectImgModel{}, errors.New("Ошибка! Нет доступа!")
 	}
 
 	// Update logo for project
-	query := fmt.Sprintf(`UPDATE %s tl SET data = jsonb_set(data, '{logo}', to_jsonb($1::text), true) WHERE tl.uuid = $2`, tableConstant.PROJECTS_TABLE)
+	query := fmt.Sprintf(`UPDATE %s tl SET data = jsonb_set(data, '{logo}', to_jsonb($1::text), true) WHERE tl.uuid = $2`, tableConstant.CB_PROJECTS)
 
 	_, err = r.db.Exec(query, data.Filepath, data.Uuid)
 	if err != nil {
 		tx.Rollback()
-		return projectModel.ProjectImageModel{}, err
+		return projectModel.ProjectImgModel{}, err
 	}
 
 	err = tx.Commit()
 	if err != nil {
 		tx.Rollback()
-		return projectModel.ProjectImageModel{}, err
+		return projectModel.ProjectImgModel{}, err
 	}
 
 	return data, nil
 }
 
 /* Get information about one project */
-func (r *ProjectPostgres) GetProject(userId, domainId int, data projectModel.ProjectUuidModel) (projectModel.ProjectDbModel, error) {
-	var project projectModel.ProjectDbModel
+func (r *ProjectPostgres) GetProject(userId, domainId int, data projectModel.ProjectUuidModel) (projectModel.ProjectLowInfoModel, error) {
+	var project projectModel.ProjectLowInfoModel
 
-	query := fmt.Sprintf("SELECT uuid, data, created_at FROM %s tl WHERE tl.uuid = $1 LIMIT 1", tableConstant.PROJECTS_TABLE)
+	query := fmt.Sprintf("SELECT uuid, data, created_at FROM %s tl WHERE tl.uuid = $1 LIMIT 1", tableConstant.CB_PROJECTS)
 
 	err := r.db.Get(&project, query, data.Uuid)
 	if err != nil {
-		return projectModel.ProjectDbModel{}, err
+		return projectModel.ProjectLowInfoModel{}, err
 	}
 
 	return project, nil
@@ -288,7 +345,7 @@ func (r *ProjectPostgres) GetProject(userId, domainId int, data projectModel.Pro
 
 /* Получение информации обо всех проектах */
 func (r *ProjectPostgres) GetProjects(userId, domainId int, data projectModel.ProjectCountModel) (projectModel.ProjectAnyCountModel, error) {
-	query := fmt.Sprintf("SELECT id FROM %s WHERE uuid=$1", tableConstant.COMPANIES_TABLE)
+	query := fmt.Sprintf("SELECT id FROM %s WHERE uuid=$1", tableConstant.CB_COMPANIES)
 	var companyId int
 
 	row := r.db.QueryRow(query, data.Uuid)
@@ -296,10 +353,10 @@ func (r *ProjectPostgres) GetProjects(userId, domainId int, data projectModel.Pr
 		return projectModel.ProjectAnyCountModel{}, err
 	}
 
-	var projects []projectModel.ProjectDbModel
+	var projects []projectModel.ProjectLowInfoModel
 	sum := (data.Count + data.Limit)
 
-	query = fmt.Sprintf("SELECT uuid, data, created_at FROM %s tl WHERE tl.companies_id = $1", tableConstant.PROJECTS_TABLE)
+	query = fmt.Sprintf("SELECT uuid, data, created_at FROM %s tl WHERE tl.companies_id = $1", tableConstant.CB_PROJECTS)
 	err := r.db.Select(&projects, query, companyId)
 	if err != nil {
 		return projectModel.ProjectAnyCountModel{}, err
@@ -341,7 +398,7 @@ func (r *ProjectPostgres) GetProjects(userId, domainId int, data projectModel.Pr
 
 /* Get information about any count managers for current project */
 func (r *ProjectPostgres) GetProjectManagers(userId, domainId int, data projectModel.ProjectCountModel) (projectModel.ProjectAnyCountModel, error) {
-	query := fmt.Sprintf("SELECT id FROM %s WHERE uuid=$1", tableConstant.COMPANIES_TABLE)
+	query := fmt.Sprintf("SELECT id FROM %s WHERE uuid=$1", tableConstant.CB_COMPANIES)
 	var companyId int
 
 	row := r.db.QueryRow(query, data.Uuid)
@@ -349,10 +406,10 @@ func (r *ProjectPostgres) GetProjectManagers(userId, domainId int, data projectM
 		return projectModel.ProjectAnyCountModel{}, err
 	}
 
-	var projects []projectModel.ProjectDbModel
+	var projects []projectModel.ProjectLowInfoModel
 	sum := (data.Count + data.Limit)
 
-	query = fmt.Sprintf("SELECT uuid, data, created_at FROM %s tl WHERE tl.companies_id = $1 LIMIT $2", tableConstant.PROJECTS_TABLE)
+	query = fmt.Sprintf("SELECT uuid, data, created_at FROM %s tl WHERE tl.companies_id = $1 LIMIT $2", tableConstant.CB_PROJECTS)
 	err := r.db.Select(&projects, query, companyId, sum)
 	if err != nil {
 		return projectModel.ProjectAnyCountModel{}, err
@@ -413,8 +470,8 @@ func (r *ProjectPostgres) ProjectUpdate(user userModel.UserIdentityModel, data p
 		return projectModel.ProjectUpdateModel{}, errors.New("Ошибка! Нет доступа!")
 	}
 
-	var projectInfo []projectModel.ProjectDbModel
-	query := fmt.Sprintf("SELECT uuid, data, created_at FROM %s WHERE uuid=$1 LIMIT 1", tableConstant.PROJECTS_TABLE)
+	var projectInfo []projectModel.ProjectLowInfoModel
+	query := fmt.Sprintf("SELECT uuid, data, created_at FROM %s WHERE uuid=$1 LIMIT 1", tableConstant.CB_PROJECTS)
 
 	err = r.db.Select(&projectInfo, query, data.Uuid)
 	if err != nil {
@@ -434,7 +491,7 @@ func (r *ProjectPostgres) ProjectUpdate(user userModel.UserIdentityModel, data p
 		return projectModel.ProjectUpdateModel{}, err
 	}
 
-	query = fmt.Sprintf("UPDATE %s tl SET data=$1 WHERE tl.uuid=$2", tableConstant.PROJECTS_TABLE)
+	query = fmt.Sprintf("UPDATE %s tl SET data=$1 WHERE tl.uuid=$2", tableConstant.CB_PROJECTS)
 
 	_, err = tx.Exec(query, projectDataJson, data.Uuid)
 	if err != nil {

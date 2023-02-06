@@ -32,13 +32,13 @@ type CompanyUpdateModel struct {
 	EmailAdmin   *string `json:"email_admin" db:"email_admin"`
 }
 
-type CompanyDbModel struct {
+type CompanyInfoModel struct {
 	Uuid      string `json:"uuid" binding:"required" db:"uuid"`
 	Data      string `json:"data" binding:"required" db:"data"`
 	CreatedAt string `json:"created_at" binding:"required" db:"created_at"`
 }
 
-type CompanyDbModelEx struct {
+type CompanyInfoModelEx struct {
 	Uuid      string       `json:"uuid" binding:"required"`
 	Data      CompanyModel `json:"data" binding:"required"`
 	CreatedAt string       `json:"created_at" binding:"required"`

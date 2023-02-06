@@ -19,7 +19,7 @@ func NewProjectService(repo repository.Project) *ProjectService {
 }
 
 /* Method for create new project */
-func (s *ProjectService) CreateProject(userId, domainId int, data projectModel.ProjectModel) (projectModel.ProjectModel, error) {
+func (s *ProjectService) CreateProject(userId, domainId int, data projectModel.ProjectCreateModel) (projectModel.ProjectCreateModel, error) {
 	return s.repo.CreateProject(userId, domainId, data)
 }
 
@@ -29,12 +29,12 @@ func (s *ProjectService) ProjectUpdate(user userModel.UserIdentityModel, data pr
 }
 
 /* Method for update image for project */
-func (s *ProjectService) ProjectUpdateImage(userId, domainId int, data projectModel.ProjectImageModel) (projectModel.ProjectImageModel, error) {
+func (s *ProjectService) ProjectUpdateImage(userId, domainId int, data projectModel.ProjectImgModel) (projectModel.ProjectImgModel, error) {
 	return s.repo.ProjectUpdateImage(userId, domainId, data)
 }
 
 /* Method for get information about object */
-func (s *ProjectService) GetProject(userId, domainId int, data projectModel.ProjectUuidModel) (projectModel.ProjectDbModel, error) {
+func (s *ProjectService) GetProject(userId, domainId int, data projectModel.ProjectUuidModel) (projectModel.ProjectLowInfoModel, error) {
 	return s.repo.GetProject(userId, domainId, data)
 }
 

@@ -1,5 +1,5 @@
 package project
 
-type UserEmailModel struct {
+type ManagerInfoModel struct {
 	Email string `json:"email" db:"email"`
 }

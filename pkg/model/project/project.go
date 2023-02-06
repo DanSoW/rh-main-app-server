@@ -4,24 +4,24 @@ import (
 	"time"
 )
 
-/* Model data for response users model */
-type ProjectModel struct {
+/* Модель данных о проекте */
+type ProjectCreateModel struct {
 	Logo        *string          `json:"logo"`
-	Uuid        string           `json:"uuid" binding:"required"`
+	CompanyUuid string           `json:"uuid" binding:"required"`
 	Title       string           `json:"title" binding:"required"`
 	Description string           `json:"description" binding:"required"`
-	Managers    []UserEmailModel `json:"managers" binding:"required"`
+	Manager     ManagerInfoModel `json:"manager" binding:"required"`
 }
 
-/* Model data for request update project in company */
+/* Модель данных для обновления проекта */
 type ProjectUpdateModel struct {
 	Uuid        string           `json:"uuid" binding:"required"`
 	Title       string           `json:"title" binding:"required"`
 	Description string           `json:"description" binding:"required"`
-	Managers    []UserEmailModel `json:"managers" binding:"required"`
+	Manager     ManagerInfoModel `json:"manager" binding:"required"`
 }
 
-type ProjectImageModel struct {
+type ProjectImgModel struct {
 	Filepath string `json:"filepath" binding:"required" db:"filepath"`
 	Uuid     string `json:"uuid" binding:"required"`
 }
@@ -30,10 +30,10 @@ type ProjectDataModel struct {
 	Logo        *string          `json:"logo" db:"logo"`
 	Title       string           `json:"title" binding:"required" db:"title"`
 	Description string           `json:"description" binding:"required" db:"description"`
-	Managers    []UserEmailModel `json:"managers" binding:"required" db:"managers"`
+	Manager     ManagerInfoModel `json:"manager" binding:"required" db:"manager"`
 }
 
-type ProjectDbModel struct {
+type ProjectLowInfoModel struct {
 	Uuid      string    `json:"uuid" db:"uuid"`
 	Data      string    `json:"data" db:"data"`
 	CreatedAt time.Time `json:"created_at" db:"created_at"`

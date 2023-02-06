@@ -39,7 +39,7 @@ type AuthType interface {
 type User interface {
 	GetProfile(c *gin.Context) (userModel.UserProfileModel, error)
 	UpdateProfile(c *gin.Context, data userModel.UserProfileUpdateDataModel) (userModel.UserJSONBModel, error)
-	GetUserCompany(userId, domainId int) (companyModel.CompanyDbModelEx, error)
+	GetUserCompany(userId, domainId int) (companyModel.CompanyInfoModelEx, error)
 	AccessCheck(userId, domainId int, value rbacModel.RoleValueModel) (bool, error)
 	GetAllRoles(user userModel.UserIdentityModel) (*userModel.UserRoleModel, error)
 }
@@ -47,6 +47,7 @@ type User interface {
 type Admin interface {
 	GetAllUsers(c *gin.Context) (adminModel.UsersResponseModel, error)
 	CreateCompany(c *gin.Context, data adminModel.CompanyModel) (adminModel.CompanyModel, error)
+	SystemAddManager(user *userModel.UserIdentityModel, data adminModel.SystemPermissionModel) (bool, error)
 }
 
 type Domain interface {
@@ -59,10 +60,10 @@ type Role interface {
 }
 
 type Project interface {
-	CreateProject(userId, domainId int, data projectModel.ProjectModel) (projectModel.ProjectModel, error)
+	CreateProject(userId, domainId int, data projectModel.ProjectCreateModel) (projectModel.ProjectCreateModel, error)
 	ProjectUpdate(user userModel.UserIdentityModel, data projectModel.ProjectUpdateModel) (projectModel.ProjectUpdateModel, error)
-	ProjectUpdateImage(userId, domainId int, data projectModel.ProjectImageModel) (projectModel.ProjectImageModel, error)
-	GetProject(userId, domainId int, data projectModel.ProjectUuidModel) (projectModel.ProjectDbModel, error)
+	ProjectUpdateImage(userId, domainId int, data projectModel.ProjectImgModel) (projectModel.ProjectImgModel, error)
+	GetProject(userId, domainId int, data projectModel.ProjectUuidModel) (projectModel.ProjectLowInfoModel, error)
 	GetProjects(userId, domainId int, data projectModel.ProjectCountModel) (projectModel.ProjectAnyCountModel, error)
 }
 
@@ -81,6 +82,11 @@ type ExcelAnalysis interface {
 	GetHeaderInfoDocument(document excelModel.DocumentIdModel) (infoModel.HeaderInfoModel, error)
 }
 
+type Object interface {
+	GetObject(column, value interface{}) (*rbacModel.ObjectDbModel, error)
+	AddResource(resource *rbacModel.ResourceModel) (*rbacModel.ObjectDbModel, error)
+}
+
 type Service struct {
 	Authorization
 	Token
@@ -92,6 +98,7 @@ type Service struct {
 	Company
 	ServiceMain
 	ExcelAnalysis
+	Object
 }
 
 func NewService(repos *repository.Repository) *Service {
@@ -108,5 +115,6 @@ func NewService(repos *repository.Repository) *Service {
 		Company:       NewCompanyService(repos.Company),
 		ServiceMain:   NewServiceMainService(repos.ServiceMain),
 		ExcelAnalysis: NewExcelAnalysisService(repos.ExcelAnalysis),
+		Object:        NewObjectService(repos.Object),
 	}
 }

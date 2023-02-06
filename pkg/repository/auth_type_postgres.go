@@ -24,7 +24,7 @@ func NewAuthTypePostgres(db *sqlx.DB) *AuthTypePostgres {
  */
 func (r *AuthTypePostgres) GetAuthType(column, value interface{}) (userModel.AuthTypeModel, error) {
 	var data userModel.AuthTypeModel
-	query := fmt.Sprintf("SELECT * FROM %s WHERE %s=$1", tableConstants.AUTH_TYPES_TABLE, column.(string))
+	query := fmt.Sprintf("SELECT * FROM %s WHERE %s=$1", tableConstants.U_AUTH_TYPES, column.(string))
 
 	var err error
 

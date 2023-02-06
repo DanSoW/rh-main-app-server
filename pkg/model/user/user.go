@@ -2,6 +2,7 @@ package user
 
 type UserIdentityModel struct {
 	UserId   int
+	UserUuid string
 	DomainId int
 }
 

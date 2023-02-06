@@ -32,7 +32,7 @@ func (s *UserService) UpdateProfile(c *gin.Context, data userModel.UserProfileUp
 }
 
 /* A method for obtaining information about the company in which this user is present */
-func (s *UserService) GetUserCompany(userId, domainId int) (companyModel.CompanyDbModelEx, error) {
+func (s *UserService) GetUserCompany(userId, domainId int) (companyModel.CompanyInfoModelEx, error) {
 	return s.repo.GetUserCompany(userId, domainId)
 }
 

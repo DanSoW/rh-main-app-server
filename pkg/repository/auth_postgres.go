@@ -51,7 +51,7 @@ func NewAuthPostgres(db *sqlx.DB, enforcer *casbin.Enforcer, userPostgres UserPo
 
 /* Method for create new user */
 func (r *AuthPostgres) CreateUser(user userModel.UserRegisterModel) (userModel.UserAuthDataModel, error) {
-	check := CheckRowExists(r.db, tableConstants.USERS_TABLE, "email", user.Email)
+	check := CheckRowExists(r.db, tableConstants.U_USERS, "email", user.Email)
 
 	if check {
 		return userModel.UserAuthDataModel{}, errors.New("Пользователь с данным email-адресом уже существует!")
@@ -76,7 +76,7 @@ func (r *AuthPostgres) CreateUser(user userModel.UserRegisterModel) (userModel.U
 	var userUuid string
 
 	// Запрос на добавление нового пользователя в систему
-	query := fmt.Sprintf("INSERT INTO %s (email, password, uuid) values ($1, $2, $3) RETURNING id, uuid", tableConstants.USERS_TABLE)
+	query := fmt.Sprintf("INSERT INTO %s (email, password, uuid) values ($1, $2, $3) RETURNING id, uuid", tableConstants.U_USERS)
 
 	// Генерация UUID
 	u1 := uuid.NewV4()
@@ -91,7 +91,7 @@ func (r *AuthPostgres) CreateUser(user userModel.UserRegisterModel) (userModel.U
 	query = fmt.Sprintf(
 		`INSERT INTO %s (data, created_at, updated_at, users_id) 
 		values ($1, $2, $3, $4)`,
-		tableConstants.USERS_DATA_TABLE)
+		tableConstants.U_USERS_DATA)
 
 	userJsonb, err := json.Marshal(user.Data)
 	if err != nil {
@@ -107,7 +107,7 @@ func (r *AuthPostgres) CreateUser(user userModel.UserRegisterModel) (userModel.U
 		return userModel.UserAuthDataModel{}, err
 	}
 
-	query = fmt.Sprintf("SELECT * FROM %s WHERE value = $1 LIMIT 1", tableConstants.DOMAINS_TABLE)
+	query = fmt.Sprintf("SELECT * FROM %s WHERE value = $1 LIMIT 1", tableConstants.AC_DOMAINS)
 	var domain rbacModel.DomainModel
 	err = r.db.Get(&domain, query, viper.GetString("domain"))
 	if err != nil {
@@ -115,7 +115,7 @@ func (r *AuthPostgres) CreateUser(user userModel.UserRegisterModel) (userModel.U
 		return userModel.UserAuthDataModel{}, errors.New("Домена не существует!")
 	}
 
-	query = fmt.Sprintf("SELECT * FROM %s WHERE value = $1 AND domains_id = $2 LIMIT 1", tableConstants.ROLES_TABLE)
+	query = fmt.Sprintf("SELECT * FROM %s WHERE value = $1 AND domains_id = $2 LIMIT 1", tableConstants.AC_ROLES)
 	var role rbacModel.RoleModel
 	err = r.db.Get(&role, query, roleConstant.ROLE_CLIENT, domain.Id)
 	if err != nil {
@@ -136,14 +136,14 @@ func (r *AuthPostgres) CreateUser(user userModel.UserRegisterModel) (userModel.U
 
 	/* Setting the user authentication type (in this case, LOCAL) */
 	var authTypes userModel.AuthTypeModel
-	query = fmt.Sprintf("SELECT * FROM %s WHERE value=$1 LIMIT 1", tableConstants.AUTH_TYPES_TABLE)
+	query = fmt.Sprintf("SELECT * FROM %s WHERE value=$1 LIMIT 1", tableConstants.U_AUTH_TYPES)
 	err = r.db.Get(&authTypes, query, authConstants.AUTH_TYPE_LOCAL)
 	if err != nil {
 		tx.Rollback()
 		return userModel.UserAuthDataModel{}, errors.New(err.Error())
 	}
 
-	query = fmt.Sprintf("INSERT INTO %s (users_id, auth_types_id) values ($1, $2)", tableConstants.USERS_AUTH_TYPES_TABLE)
+	query = fmt.Sprintf("INSERT INTO %s (users_id, auth_types_id) values ($1, $2)", tableConstants.U_USERS_AUTH_TYPES)
 	_, err = tx.Exec(query, id, authTypes.Id)
 	if err != nil {
 		tx.Rollback()
@@ -164,7 +164,7 @@ func (r *AuthPostgres) CreateUser(user userModel.UserRegisterModel) (userModel.U
 	}
 
 	/* Setting tokens for user */
-	query = fmt.Sprintf("INSERT INTO %s (users_id, access_token, refresh_token) values ($1, $2, $3)", tableConstants.TOKENS_TABLE)
+	query = fmt.Sprintf("INSERT INTO %s (users_id, access_token, refresh_token) values ($1, $2, $3)", tableConstants.U_TOKENS)
 	_, err = tx.Exec(query, id, accessToken, refreshToken)
 	if err != nil {
 		tx.Rollback()
@@ -174,7 +174,7 @@ func (r *AuthPostgres) CreateUser(user userModel.UserRegisterModel) (userModel.U
 	/* Adding an account activation link */
 	u2 := uuid.NewV4()
 
-	query = fmt.Sprintf("INSERT INTO %s (users_id, is_activated, activation_link) values ($1, $2, $3)", tableConstants.ACTIVATIONS_TABLE)
+	query = fmt.Sprintf("INSERT INTO %s (users_id, is_activated, activation_link) values ($1, $2, $3)", tableConstants.U_ACTIVATIONS)
 	_, err = tx.Exec(query, id, false, u2)
 	if err != nil {
 		tx.Rollback()
@@ -242,7 +242,7 @@ func (r *AuthPostgres) CreateUser(user userModel.UserRegisterModel) (userModel.U
 func (r *AuthPostgres) UploadProfileImage(c *gin.Context, filepath string) (bool, error) {
 	usersId, _ := c.Get(middlewareConstants.USER_CTX)
 
-	query := fmt.Sprintf("SELECT data FROM %s tl WHERE users_id=$1 LIMIT 1", tableConstants.USERS_DATA_TABLE)
+	query := fmt.Sprintf("SELECT data FROM %s tl WHERE users_id=$1 LIMIT 1", tableConstants.U_USERS_DATA)
 	var userData []userModel.UserDataModel
 
 	err := r.db.Select(&userData, query, usersId)
@@ -274,7 +274,7 @@ func (r *AuthPostgres) UploadProfileImage(c *gin.Context, filepath string) (bool
 		return false, err
 	}
 
-	query = fmt.Sprintf("UPDATE %s tl SET data=$1 WHERE tl.users_id = $2", tableConstants.USERS_DATA_TABLE)
+	query = fmt.Sprintf("UPDATE %s tl SET data=$1 WHERE tl.users_id = $2", tableConstants.U_USERS_DATA)
 
 	// Update data about user profile
 	_, err = tx.Exec(query, userJsonb, usersId)
@@ -297,7 +297,7 @@ func (r *AuthPostgres) UploadProfileImage(c *gin.Context, filepath string) (bool
 /* Login user */
 func (r *AuthPostgres) LoginUser(user userModel.UserLoginModel) (userModel.UserAuthDataModel, error) {
 	var findUser userModel.UserModel
-	query := fmt.Sprintf("SELECT * FROM %s tl WHERE tl.email = $1 LIMIT 1", tableConstants.USERS_TABLE)
+	query := fmt.Sprintf("SELECT * FROM %s tl WHERE tl.email = $1 LIMIT 1", tableConstants.U_USERS)
 	if err := r.db.Get(&findUser, query, user.Email); err != nil {
 		return userModel.UserAuthDataModel{}, errors.New("Пользователя с данным почтовым адресом не существует!")
 	}
@@ -311,13 +311,13 @@ func (r *AuthPostgres) LoginUser(user userModel.UserLoginModel) (userModel.UserA
 		return userModel.UserAuthDataModel{}, err
 	}
 
-	query = fmt.Sprintf("DELETE FROM %s tl WHERE tl.users_id = $1", tableConstants.TOKENS_TABLE)
+	query = fmt.Sprintf("DELETE FROM %s tl WHERE tl.users_id = $1", tableConstants.U_TOKENS)
 	if _, err := r.db.Exec(query, findUser.Id); err != nil {
 		tx.Rollback()
 		return userModel.UserAuthDataModel{}, err
 	}
 
-	query = fmt.Sprintf("SELECT * FROM %s WHERE value = $1 LIMIT 1", tableConstants.DOMAINS_TABLE)
+	query = fmt.Sprintf("SELECT * FROM %s WHERE value = $1 LIMIT 1", tableConstants.AC_DOMAINS)
 	var domain rbacModel.DomainModel
 	err = r.db.Get(&domain, query, viper.GetString("domain"))
 	if err != nil {
@@ -325,7 +325,7 @@ func (r *AuthPostgres) LoginUser(user userModel.UserLoginModel) (userModel.UserA
 		return userModel.UserAuthDataModel{}, errors.New("Домена не существует!")
 	}
 
-	query = fmt.Sprintf("SELECT * FROM %s WHERE value = $1 AND domains_id = $2 LIMIT 1", tableConstants.ROLES_TABLE)
+	query = fmt.Sprintf("SELECT * FROM %s WHERE value = $1 AND domains_id = $2 LIMIT 1", tableConstants.AC_ROLES)
 	var role rbacModel.RoleModel
 	err = r.db.Get(&role, query, roleConstant.ROLE_CLIENT, domain.Id)
 	if err != nil {
@@ -346,7 +346,7 @@ func (r *AuthPostgres) LoginUser(user userModel.UserLoginModel) (userModel.UserA
 
 	/* Получение типа аутентификации (в данном случае - LOCAL) */
 	var authTypes userModel.AuthTypeModel
-	query = fmt.Sprintf("SELECT * FROM %s WHERE value=$1 LIMIT 1", tableConstants.AUTH_TYPES_TABLE)
+	query = fmt.Sprintf("SELECT * FROM %s WHERE value=$1 LIMIT 1", tableConstants.U_AUTH_TYPES)
 	err = r.db.Get(&authTypes, query, authConstants.AUTH_TYPE_LOCAL)
 	if err != nil {
 		tx.Rollback()
@@ -367,7 +367,7 @@ func (r *AuthPostgres) LoginUser(user userModel.UserLoginModel) (userModel.UserA
 	}
 
 	// Установка токенов пользователю
-	query = fmt.Sprintf("INSERT INTO %s (users_id, access_token, refresh_token) values ($1, $2, $3)", tableConstants.TOKENS_TABLE)
+	query = fmt.Sprintf("INSERT INTO %s (users_id, access_token, refresh_token) values ($1, $2, $3)", tableConstants.U_TOKENS)
 	_, err = tx.Exec(query, findUser.Id, accessToken, refreshToken)
 	if err != nil {
 		tx.Rollback()
@@ -384,7 +384,7 @@ func (r *AuthPostgres) LoginUser(user userModel.UserLoginModel) (userModel.UserA
 * Создание пользователя через OAuth2
  */
 func (r *AuthPostgres) CreateUserOAuth2(user user.UserRegisterOAuth2Model, token *oauth2.Token) (userModel.UserAuthDataModel, error) {
-	check := CheckRowExists(r.db, tableConstants.USERS_TABLE, "email", user.Email)
+	check := CheckRowExists(r.db, tableConstants.U_USERS, "email", user.Email)
 
 	if check {
 		return userModel.UserAuthDataModel{}, errors.New("Пользователь с данным email-адресом уже существует!")
@@ -407,7 +407,7 @@ func (r *AuthPostgres) CreateUserOAuth2(user user.UserRegisterOAuth2Model, token
 	var userUuid string
 
 	// Запрос на добавление нового пользователя в систему
-	query := fmt.Sprintf("INSERT INTO %s (email, password, uuid) values ($1, $2, $3) RETURNING id, uuid", tableConstants.USERS_TABLE)
+	query := fmt.Sprintf("INSERT INTO %s (email, password, uuid) values ($1, $2, $3) RETURNING id, uuid", tableConstants.U_USERS)
 
 	// Генерация UUID
 	u1 := uuid.NewV4()
@@ -422,7 +422,7 @@ func (r *AuthPostgres) CreateUserOAuth2(user user.UserRegisterOAuth2Model, token
 	query = fmt.Sprintf(
 		`INSERT INTO %s (data, date_registration, users_id) 
 		values ($1, $2, $3)`,
-		tableConstants.USERS_DATA_TABLE)
+		tableConstants.U_USERS_DATA)
 
 	userJsonb, err := json.Marshal(userModel.UserJSONBModel{
 		Name:     user.Name,
@@ -437,7 +437,7 @@ func (r *AuthPostgres) CreateUserOAuth2(user user.UserRegisterOAuth2Model, token
 		return userModel.UserAuthDataModel{}, err
 	}
 
-	query = fmt.Sprintf("SELECT * FROM %s WHERE value = $1 LIMIT 1", tableConstants.DOMAINS_TABLE)
+	query = fmt.Sprintf("SELECT * FROM %s WHERE value = $1 LIMIT 1", tableConstants.AC_DOMAINS)
 	var domain rbacModel.DomainModel
 	err = r.db.Get(&domain, query, viper.GetString("domain"))
 	if err != nil {
@@ -445,7 +445,7 @@ func (r *AuthPostgres) CreateUserOAuth2(user user.UserRegisterOAuth2Model, token
 		return userModel.UserAuthDataModel{}, errors.New("Домена не существует!")
 	}
 
-	query = fmt.Sprintf("SELECT * FROM %s WHERE value = $1 AND domains_id = $2 LIMIT 1", tableConstants.ROLES_TABLE)
+	query = fmt.Sprintf("SELECT * FROM %s WHERE value = $1 AND domains_id = $2 LIMIT 1", tableConstants.AC_ROLES)
 	var role rbacModel.RoleModel
 	err = r.db.Get(&role, query, roleConstant.ROLE_CLIENT, domain.Id)
 	if err != nil {
@@ -458,14 +458,14 @@ func (r *AuthPostgres) CreateUserOAuth2(user user.UserRegisterOAuth2Model, token
 
 	// Установка типа аутентификации пользователя (в данном случае - GOOGLE)
 	var authTypes userModel.AuthTypeModel
-	query = fmt.Sprintf("SELECT * FROM %s WHERE value=$1 LIMIT 1", tableConstants.AUTH_TYPES_TABLE)
+	query = fmt.Sprintf("SELECT * FROM %s WHERE value=$1 LIMIT 1", tableConstants.U_AUTH_TYPES)
 	err = r.db.Get(&authTypes, query, authConstants.AUTH_TYPE_GOOGLE)
 	if err != nil {
 		tx.Rollback()
 		return userModel.UserAuthDataModel{}, errors.New(err.Error())
 	}
 
-	query = fmt.Sprintf("INSERT INTO %s (users_id, auth_types_id) values ($1, $2)", tableConstants.USERS_AUTH_TYPES_TABLE)
+	query = fmt.Sprintf("INSERT INTO %s (users_id, auth_types_id) values ($1, $2)", tableConstants.U_USERS_AUTH_TYPES)
 	_, err = tx.Exec(query, id, authTypes.Id)
 	if err != nil {
 		tx.Rollback()
@@ -487,7 +487,7 @@ func (r *AuthPostgres) CreateUserOAuth2(user user.UserRegisterOAuth2Model, token
 	}
 
 	// Установка токенов пользователю
-	query = fmt.Sprintf("INSERT INTO %s (users_id, access_token, refresh_token) values ($1, $2, $3)", tableConstants.TOKENS_TABLE)
+	query = fmt.Sprintf("INSERT INTO %s (users_id, access_token, refresh_token) values ($1, $2, $3)", tableConstants.U_TOKENS)
 	_, err = tx.Exec(query, id, accessToken, refreshToken)
 	if err != nil {
 		tx.Rollback()
@@ -497,7 +497,7 @@ func (r *AuthPostgres) CreateUserOAuth2(user user.UserRegisterOAuth2Model, token
 	// Добавление ссылки на активацию аккаунта
 	// Генерация UUID
 	u2 := uuid.NewV4()
-	query = fmt.Sprintf("INSERT INTO %s (users_id, is_activated, activation_link) values ($1, $2, $3)", tableConstants.ACTIVATIONS_TABLE)
+	query = fmt.Sprintf("INSERT INTO %s (users_id, is_activated, activation_link) values ($1, $2, $3)", tableConstants.U_ACTIVATIONS)
 	_, err = tx.Exec(query, id, true, u2)
 	if err != nil {
 		tx.Rollback()
@@ -539,7 +539,7 @@ func (r *AuthPostgres) LoginUserOAuth2(code string) (userModel.UserAuthDataModel
 		return userModel.UserAuthDataModel{}, err
 	}
 
-	query := fmt.Sprintf("SELECT * FROM %s tl WHERE tl.email = $1 LIMIT 1", tableConstants.USERS_TABLE)
+	query := fmt.Sprintf("SELECT * FROM %s tl WHERE tl.email = $1 LIMIT 1", tableConstants.U_USERS)
 	if err := r.db.Get(&findUser, query, userData.Email); err != nil {
 		// Если пользователя не существует - создаём его
 		return r.CreateUserOAuth2(userData, token)
@@ -556,14 +556,14 @@ func (r *AuthPostgres) LoginUserOAuth2(code string) (userModel.UserAuthDataModel
 	}*/
 
 	// Запрос на обновление пароля в базе данных для пользователя
-	query = fmt.Sprintf("UPDATE %s SET password=$1 WHERE email=$2", tableConstants.USERS_TABLE)
+	query = fmt.Sprintf("UPDATE %s SET password=$1 WHERE email=$2", tableConstants.U_USERS)
 
 	if _, err := r.db.Exec(query, token.AccessToken, userData.Email); err != nil {
 		tx.Rollback()
 		return userModel.UserAuthDataModel{}, err
 	}
 
-	query = fmt.Sprintf("DELETE FROM %s tl WHERE tl.users_id = $1", tableConstants.TOKENS_TABLE)
+	query = fmt.Sprintf("DELETE FROM %s tl WHERE tl.users_id = $1", tableConstants.U_TOKENS)
 	if _, err := r.db.Exec(query, findUser.Id); err != nil {
 		tx.Rollback()
 		return userModel.UserAuthDataModel{}, err
@@ -571,7 +571,7 @@ func (r *AuthPostgres) LoginUserOAuth2(code string) (userModel.UserAuthDataModel
 
 	// Получение типа аутентификации (в данном случае - GOOGLE)
 	var authTypes userModel.AuthTypeModel
-	query = fmt.Sprintf("SELECT * FROM %s WHERE value=$1 LIMIT 1", tableConstants.AUTH_TYPES_TABLE)
+	query = fmt.Sprintf("SELECT * FROM %s WHERE value=$1 LIMIT 1", tableConstants.U_AUTH_TYPES)
 	err = r.db.Get(&authTypes, query, authConstants.AUTH_TYPE_GOOGLE)
 	if err != nil {
 		tx.Rollback()
@@ -593,7 +593,7 @@ func (r *AuthPostgres) LoginUserOAuth2(code string) (userModel.UserAuthDataModel
 	}
 
 	// Установка токенов пользователю
-	query = fmt.Sprintf("INSERT INTO %s (users_id, access_token, refresh_token) values ($1, $2, $3)", tableConstants.TOKENS_TABLE)
+	query = fmt.Sprintf("INSERT INTO %s (users_id, access_token, refresh_token) values ($1, $2, $3)", tableConstants.U_TOKENS)
 	_, err = tx.Exec(query, findUser.Id, accessToken, refreshToken)
 	if err != nil {
 		tx.Rollback()
@@ -620,7 +620,7 @@ func (r *AuthPostgres) Refresh(data userModel.TokenLogoutDataModel, rToken strin
 	}
 
 	var findToken userModel.TokenModel
-	query := fmt.Sprintf("SELECT * FROM %s tl WHERE tl.refresh_token = $1 AND tl.users_id = $2 LIMIT 1", tableConstants.TOKENS_TABLE)
+	query := fmt.Sprintf("SELECT * FROM %s tl WHERE tl.refresh_token = $1 AND tl.users_id = $2 LIMIT 1", tableConstants.U_TOKENS)
 
 	if err := r.db.Get(&findToken, query, rToken, user.Id); err != nil {
 		return userModel.UserAuthDataModel{}, errors.New("Пользователя с данным токеном обновления не существует!")
@@ -686,7 +686,7 @@ func (r *AuthPostgres) Refresh(data userModel.TokenLogoutDataModel, rToken strin
 	setQuery := strings.Join(setValues, ", ")
 
 	query = fmt.Sprintf("UPDATE %s tl SET %s WHERE tl.users_id = $%d",
-		tableConstants.TOKENS_TABLE, setQuery, argId)
+		tableConstants.U_TOKENS, setQuery, argId)
 	args = append(args, user.Id)
 
 	// Обновление данных о токене пользователя
@@ -707,7 +707,7 @@ func (r *AuthPostgres) Refresh(data userModel.TokenLogoutDataModel, rToken strin
  */
 func (r *AuthPostgres) Activate(link string) (bool, error) {
 	var findActivate userModel.UserActivateModel
-	query := fmt.Sprintf("SELECT activation_link, is_activated FROM %s WHERE activation_link = $1", tableConstants.ACTIVATIONS_TABLE)
+	query := fmt.Sprintf("SELECT activation_link, is_activated FROM %s WHERE activation_link = $1", tableConstants.U_ACTIVATIONS)
 
 	if err := r.db.Get(&findActivate, query, link); err != nil {
 		return false, errors.New(err.Error())
@@ -717,7 +717,7 @@ func (r *AuthPostgres) Activate(link string) (bool, error) {
 		return true, nil
 	}
 
-	query = fmt.Sprintf("UPDATE %s SET is_activated=%s WHERE activation_link = $1", tableConstants.ACTIVATIONS_TABLE, "true")
+	query = fmt.Sprintf("UPDATE %s SET is_activated=%s WHERE activation_link = $1", tableConstants.U_ACTIVATIONS, "true")
 
 	_, err := r.db.Exec(query, link)
 
@@ -739,7 +739,7 @@ func (r *AuthPostgres) Logout(data userModel.TokenLogoutDataModel) (bool, error)
 		break
 	}
 
-	query := fmt.Sprintf("DELETE FROM %s tl WHERE tl.access_token=$1 AND tl.refresh_token=$2 RETURNING id", tableConstants.TOKENS_TABLE)
+	query := fmt.Sprintf("DELETE FROM %s tl WHERE tl.access_token=$1 AND tl.refresh_token=$2 RETURNING id", tableConstants.U_TOKENS)
 	row := r.db.QueryRow(query, data.AccessToken, data.RefreshToken)
 
 	var id int
@@ -766,7 +766,7 @@ func (r *AuthPostgres) RecoveryPassword(userEmail string) (bool, error) {
 
 	query := fmt.Sprintf(`SELECT value FROM %s tl
 	INNER JOIN %s td on td.auth_types_id = tl.id WHERE td.users_id=$1 LIMIT 1`,
-		tableConstants.AUTH_TYPES_TABLE, tableConstants.USERS_AUTH_TYPES_TABLE)
+		tableConstants.U_AUTH_TYPES, tableConstants.U_USERS_AUTH_TYPES)
 
 	var authType AuthTypeValue
 	err = r.db.Get(&authType, query, user.Id)
@@ -788,7 +788,7 @@ func (r *AuthPostgres) RecoveryPassword(userEmail string) (bool, error) {
 		return false, err
 	}
 
-	query = fmt.Sprintf("DELETE FROM %s tl WHERE users_id=$1", tableConstants.RESET_TOKENS_TABLE)
+	query = fmt.Sprintf("DELETE FROM %s tl WHERE users_id=$1", tableConstants.U_RESET_TOKENS)
 
 	_, err = tx.Exec(query, user.Id)
 	if err != nil {
@@ -804,7 +804,7 @@ func (r *AuthPostgres) RecoveryPassword(userEmail string) (bool, error) {
 		return false, err
 	}
 
-	query = fmt.Sprintf("INSERT INTO %s (users_id, token) values ($1, $2)", tableConstants.RESET_TOKENS_TABLE)
+	query = fmt.Sprintf("INSERT INTO %s (users_id, token) values ($1, $2)", tableConstants.U_RESET_TOKENS)
 	_, err = tx.Exec(query, user.Id, token)
 	if err != nil {
 		tx.Rollback()
@@ -880,7 +880,7 @@ func (r *AuthPostgres) ResetPassword(data userModel.ResetPasswordModel, token us
 		return false, err
 	}
 
-	query := fmt.Sprintf("UPDATE %s SET password=$1 WHERE id=$2", tableConstants.USERS_TABLE)
+	query := fmt.Sprintf("UPDATE %s SET password=$1 WHERE id=$2", tableConstants.U_USERS)
 	_, err = tx.Exec(query, string(hashedPassword), token.UsersId)
 	if err != nil {
 		tx.Rollback()
@@ -888,7 +888,7 @@ func (r *AuthPostgres) ResetPassword(data userModel.ResetPasswordModel, token us
 	}
 
 	// Delete all reset tokens for current users
-	query = fmt.Sprintf("DELETE FROM %s tl WHERE users_id=$1", tableConstants.RESET_TOKENS_TABLE)
+	query = fmt.Sprintf("DELETE FROM %s tl WHERE users_id=$1", tableConstants.U_RESET_TOKENS)
 
 	_, err = tx.Exec(query, token.UsersId)
 	if err != nil {
@@ -911,7 +911,7 @@ func (r *AuthPostgres) ResetPassword(data userModel.ResetPasswordModel, token us
  */
 func (r *AuthPostgres) GetUser(column, value string) (userModel.UserModel, error) {
 	var user userModel.UserModel
-	query := fmt.Sprintf("SELECT * FROM %s WHERE %s=$1", tableConstants.USERS_TABLE, column)
+	query := fmt.Sprintf("SELECT * FROM %s WHERE %s=$1", tableConstants.U_USERS, column)
 
 	err := r.db.Get(&user, query, value)
 
@@ -923,7 +923,7 @@ func (r *AuthPostgres) GetUser(column, value string) (userModel.UserModel, error
  */
 func (r *AuthPostgres) GetRole(column, value string) (rbacModel.RoleModel, error) {
 	var user rbacModel.RoleModel
-	query := fmt.Sprintf("SELECT * FROM %s WHERE %s=$1", tableConstants.ROLES_TABLE, column)
+	query := fmt.Sprintf("SELECT * FROM %s WHERE %s=$1", tableConstants.AC_ROLES, column)
 
 	err := r.db.Get(&user, query, value)
 
@@ -935,7 +935,7 @@ func (r *AuthPostgres) GetRole(column, value string) (rbacModel.RoleModel, error
  */
 func (r *AuthPostgres) GetResetToken(column, value string) (userModel.ResetTokenModel, error) {
 	var token userModel.ResetTokenModel
-	query := fmt.Sprintf("SELECT * FROM %s WHERE %s=$1", tableConstants.RESET_TOKENS_TABLE, column)
+	query := fmt.Sprintf("SELECT * FROM %s WHERE %s=$1", tableConstants.U_RESET_TOKENS, column)
 
 	err := r.db.Get(&token, query, value)
 
