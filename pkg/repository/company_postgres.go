@@ -266,3 +266,53 @@ func (r *CompanyPostgres) GetManager(user userModel.UserIdentityModel, data comp
 		Projects: projects,
 	}, nil
 }
+
+func (r *CompanyPostgres) Get(column, value interface{}) (*companyModel.CompanyDbModel, error) {
+	var company companyModel.CompanyDbModel
+	query := fmt.Sprintf("SELECT * FROM %s WHERE %s=$1", tableConstant.CB_COMPANIES, column.(string))
+
+	var err error
+
+	switch value.(type) {
+	case int:
+		err = r.db.Get(&company, query, value.(int))
+		break
+	case string:
+		err = r.db.Get(&company, query, value.(string))
+		break
+	}
+
+	return &company, err
+}
+
+func (r *CompanyPostgres) GetEx(column, value interface{}) (*companyModel.CompanyDbExModel, error) {
+	var company companyModel.CompanyDbModel
+	query := fmt.Sprintf("SELECT * FROM %s WHERE %s=$1", tableConstant.CB_COMPANIES, column.(string))
+
+	var err error
+
+	switch value.(type) {
+	case int:
+		err = r.db.Get(&company, query, value.(int))
+		break
+	case string:
+		err = r.db.Get(&company, query, value.(string))
+		break
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	var data companyModel.CompanyDataModel
+	err = json.Unmarshal([]byte(company.Data), data)
+
+	return &companyModel.CompanyDbExModel{
+		Id:        company.Id,
+		Uuid:      company.Uuid,
+		Data:      data,
+		CreatedAt: company.CreatedAt,
+		UpdatedAt: company.UpdatedAt,
+		UsersId:   company.UsersId,
+	}, err
+}

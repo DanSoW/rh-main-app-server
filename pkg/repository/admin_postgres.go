@@ -104,7 +104,7 @@ func (r *AdminPostgres) CreateCompany(c *gin.Context, data adminModel.CompanyMod
 
 	query = fmt.Sprintf("SELECT * FROM %s WHERE value=$1", tableConstant.AC_TYPES_OBJECTS)
 
-	err = r.db.Get(&typesObjects, query, objectConstant.TYPE_COMPANY)
+	err = r.db.Get(&typesObjects, query, objectConstant.COMPANY)
 	if err != nil {
 		tx.Rollback()
 		return adminModel.CompanyModel{}, err

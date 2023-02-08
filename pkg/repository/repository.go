@@ -72,6 +72,8 @@ type Company interface {
 	GetManager(user userModel.UserIdentityModel, data companyModel.ManagerUuidModel) (companyModel.ManagerCompanyModel, error)
 	CompanyUpdateImage(user userModel.UserIdentityModel, data companyModel.CompanyImageModel) (companyModel.CompanyImageModel, error)
 	CompanyUpdate(user userModel.UserIdentityModel, data companyModel.CompanyUpdateModel) (companyModel.CompanyUpdateModel, error)
+	Get(column, value interface{}) (*companyModel.CompanyDbModel, error)
+	GetEx(column, value interface{}) (*companyModel.CompanyDbExModel, error)
 }
 
 type Wrapper interface {
@@ -115,15 +117,15 @@ type Repository struct {
 
 func NewRepository(db *sqlx.DB, enforcer *casbin.Enforcer) *Repository {
 	wrapper := NewWrapperPostgres(db)
-
 	domain := NewDomainPostgres(db)
+	acTypeObject := NewTypeObjectPostgres(db)
+	object := NewObjectPostgres(db, acTypeObject)
 	role := NewRolePostgres(db, enforcer)
 	user := NewUserPostgres(db, enforcer, domain, role)
 	admin := NewAdminPostgres(db, enforcer, domain, role, user)
-	project := NewProjectPostgres(db, enforcer, role, user)
+	project := NewProjectPostgres(db, enforcer, role, user, object)
 	company := NewCompanyPostgres(db, enforcer, role, user, wrapper)
 	serviceMain := NewServiceMainRepository(db, enforcer, user)
-	acTypeObject := NewTypeObjectPostgres(db)
 
 	return &Repository{
 		Authorization: NewAuthPostgres(db, enforcer, *user),
@@ -137,7 +139,7 @@ func NewRepository(db *sqlx.DB, enforcer *casbin.Enforcer) *Repository {
 		Wrapper:       wrapper,
 		ServiceMain:   serviceMain,
 		ExcelAnalysis: NewExcelAnalysis(),
-		Object:        NewObjectPostgres(db, acTypeObject),
+		Object:        object,
 		TypeObject:    acTypeObject,
 	}
 }

@@ -176,7 +176,7 @@ func (r *UserPostgres) GetUserCompany(userId, domainId int) (companyModel.Compan
 
 	var companies []companyModel.CompanyRuleModelEx
 	err := r.db.Select(&companies, query,
-		objectConstant.TYPE_COMPANY, userId,
+		objectConstant.COMPANY, userId,
 		actionConstant.ADMINISTRATION, actionConstant.MANAGEMENT,
 	)
 

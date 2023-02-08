@@ -9,11 +9,10 @@ import (
 	objectConstant "main-server/pkg/constant/object"
 	roleConstant "main-server/pkg/constant/role"
 	tableConstant "main-server/pkg/constant/table"
-	companyModel "main-server/pkg/model/company"
 	projectModel "main-server/pkg/model/project"
+	"main-server/pkg/model/rbac"
 	rbacModel "main-server/pkg/model/rbac"
 	userModel "main-server/pkg/model/user"
-	"main-server/pkg/model/worker"
 	workerModel "main-server/pkg/model/worker"
 	"sort"
 
@@ -30,15 +29,26 @@ type ProjectPostgres struct {
 	enforcer *casbin.Enforcer
 	role     *RolePostgres
 	user     *UserPostgres
+	object   *ObjectPostgres
+	company  *CompanyPostgres
 }
 
 /* Функция создания нового экземпляра структуры ProjectPostgres */
-func NewProjectPostgres(db *sqlx.DB, enforcer *casbin.Enforcer, role *RolePostgres, user *UserPostgres) *ProjectPostgres {
+func NewProjectPostgres(
+	db *sqlx.DB,
+	enforcer *casbin.Enforcer,
+	role *RolePostgres,
+	user *UserPostgres,
+	object *ObjectPostgres,
+	company *CompanyPostgres,
+) *ProjectPostgres {
 	return &ProjectPostgres{
 		db:       db,
 		enforcer: enforcer,
 		role:     role,
 		user:     user,
+		object:   object,
+		company:  company,
 	}
 }
 
@@ -51,11 +61,8 @@ func (r *ProjectPostgres) CreateProject(userId, domainId int, data projectModel.
 	}
 
 	// Получение информации о компании
-	query := fmt.Sprintf("SELECT * FROM %s WHERE uuid=$1", tableConstant.CB_COMPANIES)
-	var company companyModel.CompanyDbModel
-
-	row := r.db.QueryRow(query, data.CompanyUuid)
-	if err := row.Scan(&company); err != nil {
+	company, err := r.company.GetEx("uuid", data.CompanyUuid)
+	if err != nil {
 		tx.Rollback()
 		return projectModel.ProjectCreateModel{}, err
 	}
@@ -69,7 +76,7 @@ func (r *ProjectPostgres) CreateProject(userId, domainId int, data projectModel.
 	}
 
 	// Определяем, присутствует ли пользователь в других компаниях
-	query = fmt.Sprintf("SELECT * FROM %s WHERE companies_id != $1")
+	query := fmt.Sprintf("SELECT * FROM %s WHERE companies_id != $1")
 	var workers []workerModel.WorkerDbModel
 	err = r.db.Select(&workers, query, company.Id)
 	if err != nil {
@@ -102,7 +109,7 @@ func (r *ProjectPostgres) CreateProject(userId, domainId int, data projectModel.
 			tableConstant.CB_WORKERS,
 		)
 
-		row = tx.QueryRow(query, uuid.NewV4().String(), "", time.Now(), time.Now(), manager.Id, company.Id)
+		row := tx.QueryRow(query, uuid.NewV4().String(), "", time.Now(), time.Now(), manager.Id, company.Id)
 		if err := row.Scan(&workerId); err != nil {
 			tx.Rollback()
 			return projectModel.ProjectCreateModel{}, err
@@ -129,153 +136,61 @@ func (r *ProjectPostgres) CreateProject(userId, domainId int, data projectModel.
 
 	// Добавление информации о проекте в БД
 	projectUuid := uuid.NewV4()
-	row = tx.QueryRow(query, projectUuid, dataJson, time.Now(), time.Now(), workerId, company.Id)
+	row := tx.QueryRow(query, projectUuid, dataJson, time.Now(), time.Now(), workerId, company.Id)
 	if err != nil {
 		tx.Rollback()
 		return projectModel.ProjectCreateModel{}, err
 	}
 
-	// Добавление пользователя в группу менеджеров в рамку данного проекта
-	//rbacModel.NewGPSubjectModel()
-
-	roleBuilderManager, err := r.role.GetRole("value", roleConstant.ROLE_BUILDER_MANAGER)
+	parentObject, err := r.object.GetObject("value", company.Uuid)
 	if err != nil {
 		tx.Rollback()
 		return projectModel.ProjectCreateModel{}, err
 	}
 
-	roleBuilderManagerJson, err := json.Marshal(worker.WorkerModel{
-		Role: roleBuilderManager.Uuid,
-	})
+	var resource rbacModel.ResourceModel
+	resource.ParentUuid = &parentObject.Value
+	resource.TypeResource = objectConstant.PROJECT
+	resource.Resource.ResourceUuid = projectUuid.String()
+	resource.Resource.Description = fmt.Sprintf("Проект компании %s", company.Data.Title)
 
+	role, err := r.role.GetRole("value", roleConstant.ROLE_BUILDER_MANAGER)
 	if err != nil {
 		tx.Rollback()
 		return projectModel.ProjectCreateModel{}, err
 	}
 
-	query = fmt.Sprintf(`
-	INSERT INTO %s (uuid, data, created_at, updated_at, users_id, companies_id) 
-	values ($1, $2, $3, $4, $5, $6) RETURNING id`,
-		tableConstant.CB_WORKERS,
-	)
-
-	for _, element := range data.Manager {
-		var user userModel.UserModel
-		queryLocal := fmt.Sprintf("SELECT * FROM %s tl WHERE tl.email=$1", tableConstant.U_USERS)
-		err = r.db.Get(&user, queryLocal, element.Email)
-		if err != nil {
-			tx.Rollback()
-			return projectModel.ProjectCreateModel{}, err
-		}
-
-		queryFindWorker := fmt.Sprintf("SELECT * FROM %s tl WHERE tl.users_id = $1", tableConstant.CB_WORKERS)
-		var workers []int
-		err = r.db.Select(&workers, queryFindWorker, user.Id)
-
-		var workerId int
-		row = tx.QueryRow(query, uuid.NewV4().String(), roleBuilderManagerJson, currentDate, currentDate, user.Id, company)
-		if err := row.Scan(&workerId); err != nil {
-			tx.Rollback()
-			return projectModel.ProjectCreateModel{}, err
-		}
-
-		queryLocal = fmt.Sprintf(`
-			INSERT INTO %s (workers_id, projects_id) 
-				values ($1, $2)`,
-			tableConstant.WORKERS_PROJECTS_TABLE,
-		)
-
-		_, err = tx.Exec(queryLocal, workerId, projectId)
-		if err != nil {
-			tx.Rollback()
-			return projectModel.ProjectCreateModel{}, err
-		}
-	}
-
-	// Adding information about a resource
-	var typesObjects rbacModel.TypesObjectsModel
-
-	query = fmt.Sprintf("SELECT * FROM %s WHERE value=$1", tableConstant.AC_TYPES_OBJECTS)
-
-	err = r.db.Get(&typesObjects, query, objectConstant.TYPE_PROJECT)
+	_, err = r.object.AddResource(&resource)
 	if err != nil {
 		tx.Rollback()
 		return projectModel.ProjectCreateModel{}, err
 	}
 
-	fmt.Println(typesObjects.Id)
+	// Модель для представления группы и информационного ресурса, в рамках которого есть определённая группа
+	var gpsm rbac.GPSubjectModel
+	gpsm.RoleId = role.Id
+	gpsm.ObjectUuid = data.CompanyUuid
 
-	query = fmt.Sprintf(`INSERT INTO %s (value, types_objects_id) values ($1, $2)`, tableConstant.AC_OBJECTS)
-
-	_, err = tx.Exec(query, projectUuid.String(), typesObjects.Id)
-	if err != nil {
-		tx.Rollback()
-		return projectModel.ProjectCreateModel{}, err
-	}
-
-	var userIdStr string = strconv.Itoa(userId)
-	var domainIdStr string = strconv.Itoa(domainId)
-
-	// Update current user policy for current article
+	// Добавление пользователю прав для данного проекта
 	_, err = r.enforcer.AddPolicies([][]string{
-		{userIdStr, domainIdStr, projectUuid.String(), actionConstant.DELETE},
-		{userIdStr, domainIdStr, projectUuid.String(), actionConstant.MODIFY},
-		{userIdStr, domainIdStr, projectUuid.String(), actionConstant.READ},
-		{userIdStr, domainIdStr, projectUuid.String(), actionConstant.ADMINISTRATION},
+		{strconv.Itoa(manager.Id), strconv.Itoa(domainId), projectUuid.String(), actionConstant.DELETE},
+		{strconv.Itoa(manager.Id), strconv.Itoa(domainId), projectUuid.String(), actionConstant.MODIFY},
+		{strconv.Itoa(manager.Id), strconv.Itoa(domainId), projectUuid.String(), actionConstant.READ},
 	})
-
 	if err != nil {
 		tx.Rollback()
 		return projectModel.ProjectCreateModel{}, err
 	}
 
-	// Get ids for user managers
-	query = fmt.Sprintf("SELECT id FROM %s WHERE email=$1 LIMIT 1", tableConstant.U_USERS)
-
-	for _, element := range data.Manager {
-		// @(idea):
-		// Можно улучшить данный фрагмент кода добавив сюда определение функции транзакции,
-		// которая бы выполнялась в текущей транзакции
-
-		var userManagerId int
-		row := r.db.QueryRow(query, element.Email)
-		if err := row.Scan(&userManagerId); err != nil {
-			continue
-		}
-
-		userManagerIdStr := strconv.Itoa(userManagerId)
-
-		_, err = r.enforcer.AddPolicies([][]string{
-			{userManagerIdStr, domainIdStr, projectUuid.String(), actionConstant.READ},
-			{userManagerIdStr, domainIdStr, projectUuid.String(), actionConstant.MANAGEMENT},
-		})
+	// Добавление пользователя в группу менеджеров в рамку данной компании
+	_, err = r.enforcer.AddRoleForUserInDomain(strconv.Itoa(manager.Id), gpsm.ToString(), strconv.Itoa(domainId))
+	if err != nil {
+		tx.Rollback()
+		return projectModel.ProjectCreateModel{}, err
 	}
 
 	// Save results all operation into a tables
 	if err := tx.Commit(); err != nil {
-		// Rejected
-		r.enforcer.RemovePolicies([][]string{
-			{userIdStr, domainIdStr, projectUuid.String(), actionConstant.DELETE},
-			{userIdStr, domainIdStr, projectUuid.String(), actionConstant.MODIFY},
-			{userIdStr, domainIdStr, projectUuid.String(), actionConstant.READ},
-			{userIdStr, domainIdStr, projectUuid.String(), actionConstant.ADMINISTRATION},
-		})
-
-		for _, element := range data.Manager {
-			var userManagerId int
-			row := r.db.QueryRow(query, element.Email)
-			if err := row.Scan(&userManagerId); err != nil {
-				continue
-			}
-
-			userManagerIdStr := strconv.Itoa(userManagerId)
-
-			_, err = r.enforcer.RemovePolicies([][]string{
-				{userManagerIdStr, domainIdStr, projectUuid.String(), actionConstant.READ},
-				{userManagerIdStr, domainIdStr, projectUuid.String(), actionConstant.MANAGEMENT},
-			})
-		}
-
 		tx.Rollback()
 		return projectModel.ProjectCreateModel{}, err
 	}

@@ -29,10 +29,10 @@ type CompanyDataModel struct {
 
 /* Расширенная модель CompanyDbModel */
 type CompanyDbExModel struct {
-	Id        int            `json:"id"`
-	Uuid      string         `json:"uuid"`
-	Data      CompanyDbModel `json:"data"`
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt time.Time      `json:"updated_at"`
-	UsersId   int            `json:"users_id"`
+	Id        int              `json:"id"`
+	Uuid      string           `json:"uuid"`
+	Data      CompanyDataModel `json:"data"`
+	CreatedAt time.Time        `json:"created_at"`
+	UpdatedAt time.Time        `json:"updated_at"`
+	UsersId   int              `json:"users_id"`
 }

@@ -44,6 +44,7 @@ func (r *ObjectPostgres) GetObject(column, value interface{}) (*rbacModel.Object
 
 /* Метод добавления нового информационного ресурса в систему */
 func (r *ObjectPostgres) AddResource(resource *rbacModel.ResourceModel) (*rbacModel.ObjectDbModel, error) {
+	// Получение типа объекта
 	typeObject, err := r.acTypeObject.GetTypeObject("value", resource.TypeResource)
 	if err != nil {
 		return nil, err
@@ -53,6 +54,7 @@ func (r *ObjectPostgres) AddResource(resource *rbacModel.ResourceModel) (*rbacMo
 	parentObject = nil
 
 	if resource.ParentUuid != nil {
+		// Получение родительского объекта
 		parentObject, err = r.GetObject("value", resource.ParentUuid)
 		if err != nil {
 			return nil, err

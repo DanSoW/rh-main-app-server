@@ -1,7 +1,12 @@
 package object
 
 const (
-	TYPE_COMPANY = "company"
-	TYPE_PROJECT = "project"
-	TYPE_ENTITY  = "entity"
+	COMPANY      = "company"
+	COMPANIES    = "companies"
+	PROJECT      = "project"
+	PROJECTS     = "projects"
+	ENTITY       = "entity"
+	ENTITIES     = "entities"
+	SUB_ENTITY   = "sub_entity"
+	SUB_ENTITIES = "sub_entities"
 )
