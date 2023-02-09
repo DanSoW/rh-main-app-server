@@ -8,6 +8,7 @@ import (
 	projectModel "main-server/pkg/model/project"
 	rbacModel "main-server/pkg/model/rbac"
 	userModel "main-server/pkg/model/user"
+	workerModel "main-server/pkg/model/worker"
 	infoModel "main-server/pkg/module/excel_analysis/model"
 
 	"github.com/casbin/casbin/v2"
@@ -32,21 +33,27 @@ type Authorization interface {
 }
 
 type Role interface {
-	GetRole(column, value interface{}) (rbacModel.RoleModel, error)
 	HasRole(usersId, domainsId int, roleValue string) (bool, error)
+
+	// CRUD
+	Get(column string, value interface{}, check bool) (*rbacModel.RoleModel, error)
 }
 
 type Domain interface {
-	GetDomain(column, value interface{}) (rbacModel.DomainModel, error)
+
+	// CRUD
+	Get(column string, value interface{}, check bool) (*rbacModel.DomainModel, error)
 }
 
 type User interface {
-	GetUser(column, value interface{}) (userModel.UserModel, error)
 	GetProfile(c *gin.Context) (userModel.UserProfileModel, error)
 	UpdateProfile(c *gin.Context, data userModel.UserProfileUpdateDataModel) (userModel.UserJSONBModel, error)
 	GetUserCompany(userId, domainId int) (companyModel.CompanyInfoModelEx, error)
 	AccessCheck(userId, domainId int, value rbacModel.RoleValueModel) (bool, error)
 	GetAllRoles(user userModel.UserIdentityModel) (*userModel.UserRoleModel, error)
+
+	// CRUD
+	Get(column string, value interface{}, check bool) (*userModel.UserModel, error)
 }
 
 type Admin interface {
@@ -56,7 +63,9 @@ type Admin interface {
 }
 
 type AuthType interface {
-	GetAuthType(column, value interface{}) (userModel.AuthTypeModel, error)
+
+	// CRUD
+	Get(column string, value interface{}, check bool) (*userModel.AuthTypeModel, error)
 }
 
 type Project interface {
@@ -65,6 +74,9 @@ type Project interface {
 	ProjectUpdateImage(userId, domainId int, data projectModel.ProjectImgModel) (projectModel.ProjectImgModel, error)
 	GetProject(userId, domainId int, data projectModel.ProjectUuidModel) (projectModel.ProjectLowInfoModel, error)
 	GetProjects(userId, domainId int, data projectModel.ProjectCountModel) (projectModel.ProjectAnyCountModel, error)
+
+	// CRUD
+	GetByWorker(id int, check bool) ([]projectModel.ProjectDbModel, error)
 }
 
 type Company interface {
@@ -72,12 +84,17 @@ type Company interface {
 	GetManager(user userModel.UserIdentityModel, data companyModel.ManagerUuidModel) (companyModel.ManagerCompanyModel, error)
 	CompanyUpdateImage(user userModel.UserIdentityModel, data companyModel.CompanyImageModel) (companyModel.CompanyImageModel, error)
 	CompanyUpdate(user userModel.UserIdentityModel, data companyModel.CompanyUpdateModel) (companyModel.CompanyUpdateModel, error)
-	Get(column, value interface{}) (*companyModel.CompanyDbModel, error)
-	GetEx(column, value interface{}) (*companyModel.CompanyDbExModel, error)
+
+	// CRUD
+	Get(column string, value interface{}, check bool) (*companyModel.CompanyDbModel, error)
+	GetEx(column string, value interface{}, check bool) (*companyModel.CompanyDbExModel, error)
+	GetByWorker(id int, check bool) ([]companyModel.CompanyDbExModel, error)
 }
 
 type Wrapper interface {
-	GetOne(table string, column, value interface{}) (interface{}, error)
+
+	// CRUD
+	Get(table, column string, value interface{}, check bool) (*interface{}, error)
 }
 
 type ServiceMain interface {
@@ -90,13 +107,24 @@ type ExcelAnalysis interface {
 
 /* Интерфейс репозитория для таблицы ac_objects */
 type Object interface {
-	GetObject(column, value interface{}) (*rbacModel.ObjectDbModel, error)
 	AddResource(resource *rbacModel.ResourceModel) (*rbacModel.ObjectDbModel, error)
+
+	// CRUD
+	Get(column string, value interface{}, check bool) (*rbacModel.ObjectDbModel, error)
 }
 
 /* Интерфейс репозитория для таблицы ac_types_objects */
 type TypeObject interface {
-	GetTypeObject(column, value interface{}) (rbacModel.TypeObjectDbModel, error)
+
+	// CRUD
+	Get(column string, value interface{}, check bool) (*rbacModel.TypeObjectDbModel, error)
+}
+
+type Worker interface {
+
+	// CRUD
+	Get(column string, value interface{}, check bool) (*workerModel.WorkerModel, error)
+	GetEx(column string, value interface{}, check bool) (*workerModel.WorkerDbExModel, error)
 }
 
 type Repository struct {
@@ -113,6 +141,7 @@ type Repository struct {
 	ExcelAnalysis
 	Object
 	TypeObject
+	Worker
 }
 
 func NewRepository(db *sqlx.DB, enforcer *casbin.Enforcer) *Repository {
@@ -123,9 +152,10 @@ func NewRepository(db *sqlx.DB, enforcer *casbin.Enforcer) *Repository {
 	role := NewRolePostgres(db, enforcer)
 	user := NewUserPostgres(db, enforcer, domain, role)
 	admin := NewAdminPostgres(db, enforcer, domain, role, user)
-	project := NewProjectPostgres(db, enforcer, role, user, object)
 	company := NewCompanyPostgres(db, enforcer, role, user, wrapper)
+	project := NewProjectPostgres(db, enforcer, role, user, object, company)
 	serviceMain := NewServiceMainRepository(db, enforcer, user)
+	worker := NewWorkerPostgres(db, company)
 
 	return &Repository{
 		Authorization: NewAuthPostgres(db, enforcer, *user),
@@ -141,5 +171,6 @@ func NewRepository(db *sqlx.DB, enforcer *casbin.Enforcer) *Repository {
 		ExcelAnalysis: NewExcelAnalysis(),
 		Object:        object,
 		TypeObject:    acTypeObject,
+		Worker:        worker,
 	}
 }

@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"errors"
 	"fmt"
 	tableConstants "main-server/pkg/constant/table"
 	rbacModel "main-server/pkg/model/rbac"
@@ -19,21 +20,29 @@ func NewDomainPostgres(db *sqlx.DB) *DomainPostgres {
 	return &DomainPostgres{db: db}
 }
 
-/* Get information about domain */
-func (r *DomainPostgres) GetDomain(column, value interface{}) (rbacModel.DomainModel, error) {
-	var domain rbacModel.DomainModel
-	query := fmt.Sprintf("SELECT * FROM %s WHERE %s=$1", tableConstants.AC_DOMAINS, column.(string))
+/* Получение информации о домене */
+func (r *DomainPostgres) Get(column string, value interface{}, check bool) (*rbacModel.DomainModel, error) {
+	var domains []rbacModel.DomainModel
+	query := fmt.Sprintf("SELECT * FROM %s WHERE %s=$1", tableConstants.AC_DOMAINS, column)
 
 	var err error
 
 	switch value.(type) {
 	case int:
-		err = r.db.Get(&domain, query, value.(int))
+		err = r.db.Select(&domains, query, value.(int))
 		break
 	case string:
-		err = r.db.Get(&domain, query, value.(string))
+		err = r.db.Select(&domains, query, value.(string))
 		break
 	}
 
-	return domain, err
+	if len(domains) <= 0 {
+		if check {
+			return nil, errors.New(fmt.Sprintf("Ошибка: домена по запросу %s:%s не найдено!", column, value))
+		}
+
+		return nil, nil
+	}
+
+	return &domains[len(domains)-1], err
 }

@@ -5,19 +5,16 @@ import (
 	repository "main-server/pkg/repository"
 )
 
-/* Structure for this service */
 type DomainService struct {
 	repo repository.Domain
 }
 
-/* Function for create new service */
 func NewDomainService(repo repository.Domain) *DomainService {
 	return &DomainService{
 		repo: repo,
 	}
 }
 
-/* Get all articles */
-func (s *DomainService) GetDomain(column, value interface{}) (rbacModel.DomainModel, error) {
-	return s.repo.GetDomain(column, value)
+func (s *DomainService) Get(column string, value interface{}, check bool) (*rbacModel.DomainModel, error) {
+	return s.repo.Get(column, value, check)
 }

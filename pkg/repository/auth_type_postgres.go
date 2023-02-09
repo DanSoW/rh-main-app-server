@@ -1,8 +1,9 @@
 package repository
 
 import (
+	"errors"
 	"fmt"
-	tableConstants "main-server/pkg/constant/table"
+	tableConstant "main-server/pkg/constant/table"
 	userModel "main-server/pkg/model/user"
 
 	"github.com/jmoiron/sqlx"
@@ -22,20 +23,28 @@ func NewAuthTypePostgres(db *sqlx.DB) *AuthTypePostgres {
 /*
 * Функция получения данных о роли
  */
-func (r *AuthTypePostgres) GetAuthType(column, value interface{}) (userModel.AuthTypeModel, error) {
-	var data userModel.AuthTypeModel
-	query := fmt.Sprintf("SELECT * FROM %s WHERE %s=$1", tableConstants.U_AUTH_TYPES, column.(string))
+func (r *AuthTypePostgres) Get(column string, value interface{}, check bool) (*userModel.AuthTypeModel, error) {
+	var authTypes []userModel.AuthTypeModel
+	query := fmt.Sprintf("SELECT * FROM %s WHERE %s=$1", tableConstant.U_AUTH_TYPES, column)
 
 	var err error
 
 	switch value.(type) {
 	case int:
-		err = r.db.Get(&data, query, value.(int))
+		err = r.db.Select(&authTypes, query, value.(int))
 		break
 	case string:
-		err = r.db.Get(&data, query, value.(string))
+		err = r.db.Select(&authTypes, query, value.(string))
 		break
 	}
 
-	return data, err
+	if len(authTypes) <= 0 {
+		if check {
+			return nil, errors.New(fmt.Sprintf("Ошибка: типа авторизации по запросу %s:%s не найдено!", column, value))
+		}
+
+		return nil, nil
+	}
+
+	return &authTypes[len(authTypes)-1], err
 }

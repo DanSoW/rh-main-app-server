@@ -5,16 +5,14 @@ import (
 	repository "main-server/pkg/repository"
 )
 
-// Структура репозитория
 type AuthTypeService struct {
 	authType repository.AuthType
 }
 
-// Функция создания нового репозитория
 func NewAuthTypeService(role repository.AuthType) *AuthTypeService {
 	return &AuthTypeService{authType: role}
 }
 
-func (s *AuthTypeService) GetAuthType(column, value string) (userModel.AuthTypeModel, error) {
-	return s.authType.GetAuthType(column, value)
+func (s *AuthTypeService) Get(column string, value interface{}, check bool) (*userModel.AuthTypeModel, error) {
+	return s.authType.Get(column, value, check)
 }

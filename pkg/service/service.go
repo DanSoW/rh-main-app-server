@@ -33,7 +33,9 @@ type Token interface {
 }
 
 type AuthType interface {
-	GetAuthType(column, value string) (userModel.AuthTypeModel, error)
+
+	// CRUD
+	Get(column string, value interface{}, check bool) (*userModel.AuthTypeModel, error)
 }
 
 type User interface {
@@ -51,12 +53,16 @@ type Admin interface {
 }
 
 type Domain interface {
-	GetDomain(column, value interface{}) (rbacModel.DomainModel, error)
+
+	// CRUD
+	Get(column string, value interface{}, check bool) (*rbacModel.DomainModel, error)
 }
 
 type Role interface {
-	GetRole(column, value interface{}) (rbacModel.RoleModel, error)
 	HasRole(usersId, domainsId int, roleValue string) (bool, error)
+
+	// CRUD
+	Get(column string, value interface{}, check bool) (*rbacModel.RoleModel, error)
 }
 
 type Project interface {
@@ -83,8 +89,10 @@ type ExcelAnalysis interface {
 }
 
 type Object interface {
-	GetObject(column, value interface{}) (*rbacModel.ObjectDbModel, error)
 	AddResource(resource *rbacModel.ResourceModel) (*rbacModel.ObjectDbModel, error)
+
+	// CRUD
+	Get(column string, value interface{}, check bool) (*rbacModel.ObjectDbModel, error)
 }
 
 type Service struct {

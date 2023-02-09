@@ -18,8 +18,8 @@ func NewRoleService(repo repository.Role) *RoleService {
 }
 
 /* Метод для получения роли */
-func (s *RoleService) GetRole(column, value interface{}) (rbacModel.RoleModel, error) {
-	return s.repo.GetRole(column, value)
+func (s *RoleService) Get(column string, value interface{}, check bool) (*rbacModel.RoleModel, error) {
+	return s.repo.Get(column, value, check)
 }
 
 /* Проверка существования у пользователя конкретной роли */

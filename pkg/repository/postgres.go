@@ -17,6 +17,7 @@ type Config struct {
 	SSLMode  string
 }
 
+/* Создание нового подключения к базе данных */
 func NewPostgresDB(cfg Config) (*sqlx.DB, error) {
 	// Открытие подключения к базе данных
 	db, err := sqlx.Open("postgres", fmt.Sprintf("host=%s port=%s user=%s dbname=%s password=%s sslmode=%s",
@@ -35,6 +36,7 @@ func NewPostgresDB(cfg Config) (*sqlx.DB, error) {
 	return db, nil
 }
 
+/* Проверка существования строки в таблице */
 func CheckRowExists(db *sqlx.DB, table, column, value string) bool {
 	fmt.Println(db)
 	query := fmt.Sprintf(`SELECT * FROM %s tl WHERE tl.%s = $1 limit 1`, table, column)

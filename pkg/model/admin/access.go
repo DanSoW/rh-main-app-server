@@ -24,7 +24,8 @@ type PermissionModel struct {
 	ActionList []string `json:"action_list" binding:"required"`
 }
 
-func (smm *SystemPermissionModel) Check(db *sqlx.DB) (bool, error) {
+/* Метод проверки модели зависимостей */
+func (smm *SystemPermissionModel) Check(db *sqlx.DB) error {
 	slice := actionConstant.GetSlice()
 
 	query := fmt.Sprintf(`SELECT value FROM %s`, tableConstant.AC_OBJECTS)
@@ -33,22 +34,22 @@ func (smm *SystemPermissionModel) Check(db *sqlx.DB) (bool, error) {
 			var objects []rbacModel.ObjectDbModel
 
 			if err := db.Select(&objects, query, item.ObjectUuid); err != nil {
-				return false, err
+				return err
 			}
 
 			if len(objects) <= 0 {
-				return false, errors.New(fmt.Sprintf("Ошибка: объекта с ID = %s нет в базе данных", item.ObjectUuid))
+				return errors.New(fmt.Sprintf("Ошибка: объекта с ID = %s нет в базе данных", item.ObjectUuid))
 			}
 
 			if len(item.ActionList) > 0 {
 				for _, subItem := range item.ActionList {
 					if exists, _ := util.InArray(subItem, slice); !exists {
-						return false, errors.New(fmt.Sprintf("Ошибка: элемента со значением %s нет в доступных действиях", subItem))
+						return errors.New(fmt.Sprintf("Ошибка: элемента со значением %s нет в доступных действиях", subItem))
 					}
 				}
 			}
 		}
 	}
 
-	return true, nil
+	return nil
 }

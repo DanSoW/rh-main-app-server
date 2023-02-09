@@ -15,8 +15,8 @@ func NewObjectService(repo repository.Object) *ObjectService {
 	}
 }
 
-func (s *ObjectService) GetObject(column, value interface{}) (*rbacModel.ObjectDbModel, error) {
-	return s.repo.GetObject(column, value)
+func (s *ObjectService) Get(column string, value interface{}, check bool) (*rbacModel.ObjectDbModel, error) {
+	return s.repo.Get(column, value, check)
 }
 
 func (s *ObjectService) AddResource(resource *rbacModel.ResourceModel) (*rbacModel.ObjectDbModel, error) {

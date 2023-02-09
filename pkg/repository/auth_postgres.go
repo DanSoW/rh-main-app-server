@@ -614,7 +614,7 @@ func (r *AuthPostgres) LoginUserOAuth2(code string) (userModel.UserAuthDataModel
  * @returns {userModel.UserAuthDataModel, error} Пара токенов (access и refresh) или ошибка
  */
 func (r *AuthPostgres) Refresh(data userModel.TokenLogoutDataModel, rToken string, token userModel.TokenOutputParse) (userModel.UserAuthDataModel, error) {
-	user, err := r.userPostgres.GetUser("id", token.UsersId)
+	user, err := r.userPostgres.Get("id", token.UsersId, true)
 	if err != nil {
 		return userModel.UserAuthDataModel{}, err
 	}

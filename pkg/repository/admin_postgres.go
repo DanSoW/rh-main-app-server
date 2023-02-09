@@ -3,7 +3,6 @@ package repository
 import (
 	//middlewareConstant "main-server/pkg/constant/middleware"
 	"encoding/json"
-	"errors"
 	"fmt"
 	actionConstant "main-server/pkg/constant/action"
 	middlewareConstant "main-server/pkg/constant/middleware"
@@ -13,7 +12,6 @@ import (
 	adminModel "main-server/pkg/model/admin"
 	rbacModel "main-server/pkg/model/rbac"
 	userModel "main-server/pkg/model/user"
-	"main-server/pkg/model/worker"
 	"strconv"
 	"time"
 
@@ -129,15 +127,11 @@ func (r *AdminPostgres) CreateCompany(c *gin.Context, data adminModel.CompanyMod
 	}
 
 	// Получение роли администратора-застройщика, которая будет выдана пользователю
-	roleAdmin, err := r.role.GetRole("value", roleConstant.ROLE_BUILDER_ADMIN)
+	roleAdmin, err := r.role.Get("value", roleConstant.ROLE_BUILDER_ADMIN, true)
 	if err != nil {
 		tx.Rollback()
 		return adminModel.CompanyModel{}, err
 	}
-
-	roleAdminJson, err := json.Marshal(worker.WorkerModel{
-		Role: roleAdmin.Uuid,
-	})
 
 	if err != nil {
 		tx.Rollback()
@@ -151,7 +145,7 @@ func (r *AdminPostgres) CreateCompany(c *gin.Context, data adminModel.CompanyMod
 		tableConstant.CB_WORKERS,
 	)
 	var workerId int
-	row = tx.QueryRow(query, uuid.NewV4().String(), roleAdminJson, currentDate, currentDate, user.Id, companyId)
+	row = tx.QueryRow(query, uuid.NewV4().String(), "", currentDate, currentDate, user.Id, companyId)
 	if err := row.Scan(&workerId); err != nil {
 		tx.Rollback()
 		return adminModel.CompanyModel{}, err
@@ -228,24 +222,15 @@ func (r *AdminPostgres) CreateCompany(c *gin.Context, data adminModel.CompanyMod
 
 /* Метод структуры для создания нового менеджера в системе */
 func (r *AdminPostgres) SystemAddManager(user *userModel.UserIdentityModel, data adminModel.SystemPermissionModel) (bool, error) {
-	check, err := data.Check(r.db)
-
+	err := data.Check(r.db)
 	if err != nil {
 		return false, err
 	}
-
-	if !check {
-		return false, errors.New("Ошибка: входная модель не валидна")
-	}
-
-	roleInfo, err := r.role.GetRole("uuid", *data.RoleUuid)
-
+	roleInfo, err := r.role.Get("uuid", *data.RoleUuid, true)
 	if err != nil {
 		return false, err
 	}
-
-	userInfo, err := r.user.GetUser("email", data.Email)
-
+	userInfo, err := r.user.Get("email", data.Email, true)
 	if err != nil {
 		return false, err
 	}

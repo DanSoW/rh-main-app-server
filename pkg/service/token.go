@@ -44,28 +44,25 @@ func (s *TokenService) ParseToken(pToken, signingKey string) (userModel.TokenOut
 
 		return []byte(signingKey), nil
 	})
-
-	if !token.Valid {
-		return userModel.TokenOutputParse{}, errors.New("token is not valid")
-	}
-
 	if err != nil {
 		return userModel.TokenOutputParse{}, err
+	}
+
+	if !token.Valid {
+		return userModel.TokenOutputParse{}, errors.New("Ошибка: некорректный токен")
 	}
 
 	claims, ok := token.Claims.(*tokenClaims)
 	if !ok {
-		return userModel.TokenOutputParse{}, errors.New("token claims are not of type")
+		return userModel.TokenOutputParse{}, errors.New("Ошибка: некорректный токен")
 	}
 
-	user, err := s.user.GetUser("uuid", claims.UsersId)
-
+	user, err := s.user.Get("uuid", claims.UsersId, true)
 	if err != nil {
 		return userModel.TokenOutputParse{}, err
 	}
 
-	authType, err := s.authType.GetAuthType("uuid", claims.AuthTypesId)
-
+	authType, err := s.authType.Get("uuid", claims.AuthTypesId, true)
 	if err != nil {
 		return userModel.TokenOutputParse{}, err
 	}
@@ -73,7 +70,7 @@ func (s *TokenService) ParseToken(pToken, signingKey string) (userModel.TokenOut
 	return userModel.TokenOutputParse{
 		UsersId:   user.Id,
 		UsersUuid: claims.UsersId,
-		AuthType:  authType,
+		AuthType:  *authType,
 		TokenApi:  claims.TokenApi,
 	}, nil
 }
@@ -94,21 +91,19 @@ func (s *TokenService) ParseTokenWithoutValid(pToken, signingKey string) (userMo
 		return userModel.TokenOutputParse{}, errors.New("token claims are not of type")
 	}
 
-	user, err := s.user.GetUser("uuid", claims.UsersId)
-
+	user, err := s.user.Get("uuid", claims.UsersId, true)
 	if err != nil {
 		return userModel.TokenOutputParse{}, err
 	}
 
-	authType, err := s.authType.GetAuthType("uuid", claims.AuthTypesId)
-
+	authType, err := s.authType.Get("uuid", claims.AuthTypesId, true)
 	if err != nil {
 		return userModel.TokenOutputParse{}, err
 	}
 
 	return userModel.TokenOutputParse{
 		UsersId:  user.Id,
-		AuthType: authType,
+		AuthType: *authType,
 		TokenApi: claims.TokenApi,
 	}, nil
 }
@@ -129,29 +124,25 @@ func (s *TokenService) ParseResetToken(pToken, signingKey string) (userModel.Res
 
 		return []byte(signingKey), nil
 	})
-
-	if !token.Valid {
-		return userModel.ResetTokenOutputParse{}, errors.New("token is not valid")
-	}
-
 	if err != nil {
 		return userModel.ResetTokenOutputParse{}, err
+	}
+	if !token.Valid {
+		return userModel.ResetTokenOutputParse{}, errors.New("Ошибка: некорректный токен")
 	}
 
 	// Получение данных из токена (с преобразованием к указателю на tokenClaims)
 	claims, ok := token.Claims.(*tokenResetClaims)
 	if !ok {
-		return userModel.ResetTokenOutputParse{}, errors.New("token claims are not of type")
+		return userModel.ResetTokenOutputParse{}, errors.New("Ошибка: некорректный токен")
 	}
 
-	_, err = s.user.GetUser("email", claims.Email)
-
+	_, err = s.user.Get("email", claims.Email, true)
 	if err != nil {
 		return userModel.ResetTokenOutputParse{}, err
 	}
 
-	user, err := s.user.GetUser("uuid", claims.UsersId)
-
+	user, err := s.user.Get("uuid", claims.UsersId, true)
 	if err != nil {
 		return userModel.ResetTokenOutputParse{}, err
 	}

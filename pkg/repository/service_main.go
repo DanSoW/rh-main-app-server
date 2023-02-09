@@ -33,7 +33,7 @@ func (r *ServiceMainRepository) SendEmail(user *userModel.UserIdentityModel, bod
 
 	// Конвертация UUID пользователей в Email-адреса
 	for _, item := range body.UuidReceivers {
-		userItem, err := r.userPostgres.GetUser("uuid", item)
+		userItem, err := r.userPostgres.Get("uuid", item, true)
 		if err != nil {
 			return false, err
 		}

@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"errors"
 	"fmt"
 	tableConstant "main-server/pkg/constant/table"
 	rbacModel "main-server/pkg/model/rbac"
@@ -24,28 +25,36 @@ func NewObjectPostgres(
 }
 
 /* Метод получения информационного ресурса из системы */
-func (r *ObjectPostgres) GetObject(column, value interface{}) (*rbacModel.ObjectDbModel, error) {
-	var object rbacModel.ObjectDbModel
-	query := fmt.Sprintf("SELECT * FROM %s WHERE %s=$1", tableConstant.AC_OBJECTS, column.(string))
+func (r *ObjectPostgres) Get(column string, value interface{}, check bool) (*rbacModel.ObjectDbModel, error) {
+	var objects []rbacModel.ObjectDbModel
+	query := fmt.Sprintf("SELECT * FROM %s WHERE %s=$1", tableConstant.AC_OBJECTS, column)
 
 	var err error
 
 	switch value.(type) {
 	case int:
-		err = r.db.Get(&object, query, value.(int))
+		err = r.db.Select(&objects, query, value.(int))
 		break
 	case string:
-		err = r.db.Get(&object, query, value.(string))
+		err = r.db.Select(&objects, query, value.(string))
 		break
 	}
 
-	return &object, err
+	if len(objects) <= 0 {
+		if check {
+			return nil, errors.New(fmt.Sprintf("Ошибка: объекта по запросу %s:%s не найдено!", column, value))
+		}
+
+		return nil, nil
+	}
+
+	return &objects[len(objects)-1], err
 }
 
 /* Метод добавления нового информационного ресурса в систему */
 func (r *ObjectPostgres) AddResource(resource *rbacModel.ResourceModel) (*rbacModel.ObjectDbModel, error) {
 	// Получение типа объекта
-	typeObject, err := r.acTypeObject.GetTypeObject("value", resource.TypeResource)
+	typeObject, err := r.acTypeObject.Get("value", resource.TypeResource, true)
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +64,7 @@ func (r *ObjectPostgres) AddResource(resource *rbacModel.ResourceModel) (*rbacMo
 
 	if resource.ParentUuid != nil {
 		// Получение родительского объекта
-		parentObject, err = r.GetObject("value", resource.ParentUuid)
+		parentObject, err = r.Get("value", resource.ParentUuid, true)
 		if err != nil {
 			return nil, err
 		}

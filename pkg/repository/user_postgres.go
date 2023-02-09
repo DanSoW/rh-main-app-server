@@ -43,22 +43,30 @@ func NewUserPostgres(
 	}
 }
 
-func (r *UserPostgres) GetUser(column, value interface{}) (userModel.UserModel, error) {
-	var user userModel.UserModel
-	query := fmt.Sprintf("SELECT * FROM %s WHERE %s=$1", tableConstant.U_USERS, column.(string))
+func (r *UserPostgres) Get(column string, value interface{}, check bool) (*userModel.UserModel, error) {
+	var users []userModel.UserModel
+	query := fmt.Sprintf("SELECT * FROM %s WHERE %s=$1", tableConstant.U_USERS, column)
 
 	var err error
 
 	switch value.(type) {
 	case int:
-		err = r.db.Get(&user, query, value.(int))
+		err = r.db.Select(&users, query, value.(int))
 		break
 	case string:
-		err = r.db.Get(&user, query, value.(string))
+		err = r.db.Select(&users, query, value.(string))
 		break
 	}
 
-	return user, err
+	if len(users) <= 0 {
+		if check {
+			return nil, errors.New(fmt.Sprintf("Ошибка: пользователя по запросу %s:%s не найдено!", column, value))
+		}
+
+		return nil, nil
+	}
+
+	return &users[len(users)-1], err
 }
 
 func (r *UserPostgres) GetProfile(c *gin.Context) (userModel.UserProfileModel, error) {
@@ -217,16 +225,14 @@ func (r *UserPostgres) GetUserCompany(userId, domainId int) (companyModel.Compan
 	}, nil
 }
 
-/* Method for to check acces every user. On result this method make decision for make navbar or other component */
+/* Проверка доступа пользователя */
 func (r *UserPostgres) AccessCheck(userId, domainId int, value rbacModel.RoleValueModel) (bool, error) {
-	role, err := r.role.GetRole("value", value.Value)
-
+	role, err := r.role.Get("value", value.Value, true)
 	if err != nil {
 		return false, err
 	}
 
 	result, err := r.enforcer.HasRoleForUser(strconv.Itoa(userId), strconv.Itoa(role.Id), strconv.Itoa(domainId))
-
 	if err != nil {
 		return false, err
 	}

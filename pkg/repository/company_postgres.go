@@ -225,7 +225,7 @@ type SQLResultListProject struct {
 func (r *CompanyPostgres) GetManager(user userModel.UserIdentityModel, data companyModel.ManagerUuidModel) (companyModel.ManagerCompanyModel, error) {
 
 	// Информация о менеджере как о пользователе
-	manager, err := r.user.GetUser("uuid", data.ManagerUuid)
+	manager, err := r.user.Get("uuid", data.ManagerUuid, true)
 	if err != nil {
 		return companyModel.ManagerCompanyModel{}, err
 	}
@@ -267,45 +267,62 @@ func (r *CompanyPostgres) GetManager(user userModel.UserIdentityModel, data comp
 	}, nil
 }
 
-func (r *CompanyPostgres) Get(column, value interface{}) (*companyModel.CompanyDbModel, error) {
-	var company companyModel.CompanyDbModel
-	query := fmt.Sprintf("SELECT * FROM %s WHERE %s=$1", tableConstant.CB_COMPANIES, column.(string))
+func (r *CompanyPostgres) Get(column string, value interface{}, check bool) (*companyModel.CompanyDbModel, error) {
+	var companies []companyModel.CompanyDbModel
+	query := fmt.Sprintf("SELECT * FROM %s WHERE %s=$1", tableConstant.CB_COMPANIES, column)
 
 	var err error
 
 	switch value.(type) {
 	case int:
-		err = r.db.Get(&company, query, value.(int))
+		err = r.db.Select(&companies, query, value.(int))
 		break
 	case string:
-		err = r.db.Get(&company, query, value.(string))
+		err = r.db.Select(&companies, query, value.(string))
 		break
 	}
 
-	return &company, err
+	if len(companies) <= 0 {
+		if check {
+			return nil, errors.New(fmt.Sprintf("Ошибка: компании по запросу %s:%s не найдено!", column, value))
+		}
+
+		return nil, nil
+	}
+
+	return &companies[len(companies)-1], err
 }
 
-func (r *CompanyPostgres) GetEx(column, value interface{}) (*companyModel.CompanyDbExModel, error) {
-	var company companyModel.CompanyDbModel
-	query := fmt.Sprintf("SELECT * FROM %s WHERE %s=$1", tableConstant.CB_COMPANIES, column.(string))
+func (r *CompanyPostgres) GetEx(column string, value interface{}, check bool) (*companyModel.CompanyDbExModel, error) {
+	var companies []companyModel.CompanyDbModel
+	query := fmt.Sprintf("SELECT * FROM %s WHERE %s=$1", tableConstant.CB_COMPANIES, column)
 
 	var err error
 
 	switch value.(type) {
 	case int:
-		err = r.db.Get(&company, query, value.(int))
+		err = r.db.Select(&companies, query, value.(int))
 		break
 	case string:
-		err = r.db.Get(&company, query, value.(string))
+		err = r.db.Select(&companies, query, value.(string))
 		break
 	}
 
-	if err != nil {
-		return nil, err
+	if len(companies) <= 0 {
+		if check {
+			return nil, errors.New(fmt.Sprintf("Ошибка: компании по запросу %s:%s не найдено!", column, value))
+		}
+
+		return nil, nil
 	}
 
 	var data companyModel.CompanyDataModel
-	err = json.Unmarshal([]byte(company.Data), data)
+	company := companies[len(companies)-1]
+
+	err = json.Unmarshal([]byte(company.Data), &data)
+	if err != nil {
+		return nil, err
+	}
 
 	return &companyModel.CompanyDbExModel{
 		Id:        company.Id,
@@ -315,4 +332,29 @@ func (r *CompanyPostgres) GetEx(column, value interface{}) (*companyModel.Compan
 		UpdatedAt: company.UpdatedAt,
 		UsersId:   company.UsersId,
 	}, err
+}
+
+func (r *CompanyPostgres) GetByWorker(id int, check bool) ([]companyModel.CompanyDbExModel, error) {
+	var companies []companyModel.CompanyDbExModel
+	query := fmt.Sprintf(
+		`SELECT c.* FROM %s c
+		INNER JOIN %s w ON c.id = w.companies_id
+		WHERE w.id = $1;`,
+		tableConstant.CB_COMPANIES,
+		tableConstant.CB_WORKERS,
+	)
+
+	var err error
+
+	err = r.db.Select(&companies, query, id)
+
+	if len(companies) <= 0 {
+		if check {
+			return nil, errors.New(fmt.Sprintf("Ошибка: компаний по запросу id:%d не найдено!", id))
+		}
+
+		return nil, nil
+	}
+
+	return companies, err
 }

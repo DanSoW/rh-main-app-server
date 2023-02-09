@@ -1,8 +1,9 @@
 package repository
 
 import (
+	"errors"
 	"fmt"
-	tableConstants "main-server/pkg/constant/table"
+	tableConstant "main-server/pkg/constant/table"
 	rbacModel "main-server/pkg/model/rbac"
 	"strconv"
 
@@ -24,28 +25,35 @@ func NewRolePostgres(db *sqlx.DB, enforcer *casbin.Enforcer) *RolePostgres {
 }
 
 /* Получение определённой роли пользователя */
-func (r *RolePostgres) GetRole(column, value interface{}) (rbacModel.RoleModel, error) {
-	var user rbacModel.RoleModel
-	query := fmt.Sprintf("SELECT * FROM %s WHERE %s=$1", tableConstants.AC_ROLES, column.(string))
+func (r *RolePostgres) Get(column string, value interface{}, check bool) (*rbacModel.RoleModel, error) {
+	var roles []rbacModel.RoleModel
+	query := fmt.Sprintf("SELECT * FROM %s WHERE %s=$1", tableConstant.AC_ROLES, column)
 
 	var err error
 
 	switch value.(type) {
 	case int:
-		err = r.db.Get(&user, query, value.(int))
+		err = r.db.Select(&roles, query, value.(int))
 		break
 	case string:
-		err = r.db.Get(&user, query, value.(string))
+		err = r.db.Select(&roles, query, value.(string))
 		break
 	}
 
-	return user, err
+	if len(roles) <= 0 {
+		if check {
+			return nil, errors.New(fmt.Sprintf("Ошибка: роли по запросу %s:%s не найдено!", column, value))
+		}
+
+		return nil, nil
+	}
+
+	return &roles[len(roles)-1], err
 }
 
 /* Проверка присутствия у пользователя определённой роли (принадлежность к группе пользователей) */
 func (r *RolePostgres) HasRole(usersId, domainsId int, roleValue string) (bool, error) {
-	data, err := r.GetRole("value", roleValue)
-
+	data, err := r.Get("value", roleValue, true)
 	if err != nil {
 		return false, err
 	}

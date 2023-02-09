@@ -27,14 +27,12 @@ func (h *Handler) userIdentity(c *gin.Context) {
 	}
 
 	data, err := h.services.Token.ParseToken(headerParts[1], viper.GetString("token.signing_key_access"))
-
 	if err != nil {
 		utilContext.NewErrorResponse(c, http.StatusUnauthorized, err.Error())
 		return
 	}
 
-	domain, err := h.services.Domain.GetDomain("value", viper.GetString("domain"))
-
+	domain, err := h.services.Domain.Get("value", viper.GetString("domain"), true)
 	if err != nil {
 		utilContext.NewErrorResponse(c, http.StatusUnauthorized, err.Error())
 		return
@@ -63,7 +61,6 @@ func (h *Handler) userIdentity(c *gin.Context) {
 
 func (h *Handler) userIdentityLogout(c *gin.Context) {
 	header := c.GetHeader(middlewareConstants.AUTHORIZATION_HEADER)
-
 	if header == "" {
 		utilContext.NewErrorResponse(c, http.StatusUnauthorized, "Пустой заголовок авторизации!")
 		return
@@ -76,7 +73,6 @@ func (h *Handler) userIdentityLogout(c *gin.Context) {
 	}
 
 	data, err := h.services.Token.ParseTokenWithoutValid(headerParts[1], viper.GetString("token.signing_key_access"))
-
 	if err != nil {
 		utilContext.NewErrorResponse(c, http.StatusUnauthorized, err.Error())
 		return

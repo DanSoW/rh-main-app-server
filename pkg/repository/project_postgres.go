@@ -61,7 +61,7 @@ func (r *ProjectPostgres) CreateProject(userId, domainId int, data projectModel.
 	}
 
 	// Получение информации о компании
-	company, err := r.company.GetEx("uuid", data.CompanyUuid)
+	company, err := r.company.GetEx("uuid", data.CompanyUuid, true)
 	if err != nil {
 		tx.Rollback()
 		return projectModel.ProjectCreateModel{}, err
@@ -69,14 +69,14 @@ func (r *ProjectPostgres) CreateProject(userId, domainId int, data projectModel.
 
 	/* Процесс определения менеджера, который будет менеджером для данного проекта */
 	// Определение пользователя в системе
-	manager, err := r.user.GetUser("email", data.Manager.Email)
+	manager, err := r.user.Get("email", data.Manager.Email, true)
 	if err != nil {
 		tx.Rollback()
 		return projectModel.ProjectCreateModel{}, err
 	}
 
-	// Определяем, присутствует ли пользователь в других компаниях
-	query := fmt.Sprintf("SELECT * FROM %s WHERE companies_id != $1")
+	// Определяем, присутствует ли пользователь в других компаниях на позиции менеджера
+	query := fmt.Sprintf("SELECT * FROM %s WHERE companies_id != $1", tableConstant.CB_WORKERS)
 	var workers []workerModel.WorkerDbModel
 	err = r.db.Select(&workers, query, company.Id)
 	if err != nil {
@@ -136,13 +136,13 @@ func (r *ProjectPostgres) CreateProject(userId, domainId int, data projectModel.
 
 	// Добавление информации о проекте в БД
 	projectUuid := uuid.NewV4()
-	row := tx.QueryRow(query, projectUuid, dataJson, time.Now(), time.Now(), workerId, company.Id)
+	_, err = tx.Exec(query, projectUuid, dataJson, time.Now(), time.Now(), workerId, company.Id)
 	if err != nil {
 		tx.Rollback()
 		return projectModel.ProjectCreateModel{}, err
 	}
 
-	parentObject, err := r.object.GetObject("value", company.Uuid)
+	parentObject, err := r.object.Get("value", company.Uuid, true)
 	if err != nil {
 		tx.Rollback()
 		return projectModel.ProjectCreateModel{}, err
@@ -154,7 +154,7 @@ func (r *ProjectPostgres) CreateProject(userId, domainId int, data projectModel.
 	resource.Resource.ResourceUuid = projectUuid.String()
 	resource.Resource.Description = fmt.Sprintf("Проект компании %s", company.Data.Title)
 
-	role, err := r.role.GetRole("value", roleConstant.ROLE_BUILDER_MANAGER)
+	role, err := r.role.Get("value", roleConstant.ROLE_BUILDER_MANAGER, true)
 	if err != nil {
 		tx.Rollback()
 		return projectModel.ProjectCreateModel{}, err
@@ -421,4 +421,24 @@ func (r *ProjectPostgres) ProjectUpdate(user userModel.UserIdentityModel, data p
 	}
 
 	return data, nil
+}
+
+func (r *ProjectPostgres) GetByWorker(id int, check bool) ([]projectModel.ProjectDbModel, error) {
+	var projects []projectModel.ProjectDbModel
+	query := fmt.Sprintf(
+		`SELECT c.* FROM %s c
+		INNER JOIN %s w ON c.id = w.companies_id
+		WHERE w.id = $1;`,
+		tableConstant.CB_COMPANIES,
+		tableConstant.CB_WORKERS,
+	)
+
+	var err error
+	err = r.db.Select(&projects, query, id)
+
+	if len(projects) <= 0 && check {
+		return projects, errors.New(fmt.Sprintf("Ошибка: компаний по запросу id:%d не найдено!", id))
+	}
+
+	return projects, err
 }
